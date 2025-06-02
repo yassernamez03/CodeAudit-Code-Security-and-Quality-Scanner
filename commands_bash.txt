@@ -1,0 +1,50 @@
+# CodeAudit Bash Script Command Examples
+
+# Basic sequential analysis of the default 'mini_project' directory
+./codeaudit.sh
+
+# Analyze a specific target directory with verbose logging
+./codeaudit.sh -v # Assumes default target 'mini_project'
+
+# --- Output Formats ---
+
+# Generate an HTML report
+./codeaudit.sh -f html -o "audit_report.html"
+
+# Generate a JSON report
+./codeaudit.sh --format json --output "audit_results.json"
+
+# --- Processing Modes ---
+
+# Sequential processing (default)
+./codeaudit.sh -m sequential
+
+# Fork processing: Uses fork() for parallelism.
+# Good for maximizing parallelism if system resources allow (Unix-like systems).
+./codeaudit.sh --mode fork -v
+
+# Subshell processing: Uses subshells with concurrency limiting.
+# Balances parallelism with system stability.
+./codeaudit.sh -m subshell -v -o subshell_report.txt # Assumes default target 'mini_project'
+
+# Thread processing (Simulated with background jobs): Processes files in batches.
+# Good for large numbers of files to avoid overwhelming the system.
+./codeaudit.sh --mode thread --verbose
+
+# --- Help ---
+
+# Display the help message
+./codeaudit.sh -h
+# or
+./codeaudit.sh --help
+
+# --- Combinations ---
+
+# Analyze 'mini_project' (default), use fork mode, output to HTML, with verbose logging
+./codeaudit.sh -m fork -f html -o "fork_report.html" -v
+
+# Analyze 'mini_project' (default), use subshell mode, output to JSON
+./codeaudit.sh --mode subshell --format json --output "subshell_results.json"
+
+# Analyze a different directory, use thread mode, verbose, output to text file
+./codeaudit.sh /path/to/your/code -m thread -v -f text -o "thread_analysis.txt"
