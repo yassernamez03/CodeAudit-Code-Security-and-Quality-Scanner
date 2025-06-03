@@ -1,136 +1,268 @@
-# CodeAudit Bash Script - Complete Command Reference
+# CodeAudit Script - Complete Command Reference
+# Updated: June 3, 2025
+# Supports both Bash (Linux/WSL) and PowerShell (Windows) environments
 
 # =====================================
 # BASIC USAGE COMMANDS
 # =====================================
 
 # Basic analysis with default settings (text format, sequential mode)
+# Bash/WSL:
 ./codeaudit.sh
+bash codeaudit.sh
+
+# PowerShell:
+bash codeaudit.sh
+wsl bash codeaudit.sh
 
 # Basic analysis with verbose output
+# Bash/WSL:
 ./codeaudit.sh -v
 ./codeaudit.sh --verbose
 
+# PowerShell:
+bash codeaudit.sh -v
+bash codeaudit.sh --verbose
+
 # Display help information
+# Bash/WSL:
 ./codeaudit.sh -h
 ./codeaudit.sh --help
+
+# PowerShell:
+bash codeaudit.sh -h
+bash codeaudit.sh --help
 
 # =====================================
 # DIRECTORY SPECIFICATION
 # =====================================
 
 # Analyze specific directory using -d option
+# Bash/WSL:
 ./codeaudit.sh -d /path/to/your/code
 ./codeaudit.sh --directory /path/to/your/code
 
+# PowerShell (with WSL paths):
+bash codeaudit.sh -d "/mnt/c/Users/admin/Documents/code"
+bash codeaudit.sh --directory "/mnt/c/path/to/code"
+
 # Analyze directory passed as positional argument
+# Bash/WSL:
 ./codeaudit.sh /path/to/your/code
 
+# PowerShell:
+bash codeaudit.sh "/mnt/c/path/to/code"
+
 # Analyze current directory
+# Bash/WSL:
 ./codeaudit.sh -d .
 ./codeaudit.sh .
+
+# PowerShell:
+bash codeaudit.sh -d .
+bash codeaudit.sh .
 
 # =====================================
 # OUTPUT FORMAT OPTIONS
 # =====================================
 
 # Text format (default)
-./codeaudit.sh -f text
+# Bash/WSL:
 ./codeaudit.sh --format text
 
+# PowerShell:
+bash codeaudit.sh --format text
+
 # HTML format
-./codeaudit.sh -f html
+# Bash/WSL:
 ./codeaudit.sh --format html
 
+# PowerShell:
+bash codeaudit.sh --format html
+
 # JSON format
-./codeaudit.sh -f json
+# Bash/WSL:
 ./codeaudit.sh --format json
 
+# PowerShell:
+bash codeaudit.sh --format json
+
 # =====================================
-# OUTPUT FILE SPECIFICATION
+# OUTPUT FILE SPECIFICATION (WITH SIMULTANEOUS OUTPUT)
 # =====================================
 
-# Save to file with -o option
+# Save to file with -o option (outputs to BOTH terminal AND file using tee)
+# Bash/WSL:
 ./codeaudit.sh -o report.txt
 ./codeaudit.sh --output report.txt
 
-# Generate HTML report
-./codeaudit.sh -f html -o "audit_report.html"
+# PowerShell:
+bash codeaudit.sh -o report.txt
+bash codeaudit.sh --output report.txt
 
-# Generate JSON report
-./codeaudit.sh -f json -o "audit_results.json"
+# Generate HTML report (simultaneous terminal + file output)
+# Bash/WSL:
+./codeaudit.sh --format html -o "audit_report.html"
+
+# PowerShell:
+bash codeaudit.sh --format html -o "audit_report.html"
+
+# Generate JSON report (simultaneous terminal + file output)
+# Bash/WSL:
+./codeaudit.sh --format json -o "audit_results.json"
+
+# PowerShell:
+bash codeaudit.sh --format json -o "audit_results.json"
 
 # Generate timestamped reports
-./codeaudit.sh -f html -o "report_$(date +%Y%m%d_%H%M%S).html"
-./codeaudit.sh -f json -o "analysis_$(date +%Y-%m-%d).json"
+# Bash/WSL:
+./codeaudit.sh --format html -o "report_$(date +%Y%m%d_%H%M%S).html"
+./codeaudit.sh --format json -o "analysis_$(date +%Y-%m-%d).json"
+
+# PowerShell:
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+bash codeaudit.sh --format html -o "report_$timestamp.html"
+$date = Get-Date -Format "yyyy-MM-dd"
+bash codeaudit.sh --format json -o "analysis_$date.json"
 
 # =====================================
-# PROCESSING MODES
+# PARALLEL PROCESSING MODES (FULLY IMPLEMENTED)
 # =====================================
 
 # Sequential processing (default)
+# Bash/WSL:
 ./codeaudit.sh -m sequential
 ./codeaudit.sh --mode sequential
 
-# Fork processing (parallel with fork)
+# PowerShell:
+bash codeaudit.sh -m sequential
+bash codeaudit.sh --mode sequential
+
+# Fork processing (TRUE parallel with explicit PID management)
+# Bash/WSL:
+./codeaudit.sh -f
+./codeaudit.sh --fork
 ./codeaudit.sh -m fork
 ./codeaudit.sh --mode fork
-./codeaudit.sh --fork
 
-# Thread processing (parallel with background jobs)
+# PowerShell:
+bash codeaudit.sh -f
+bash codeaudit.sh --fork
+bash codeaudit.sh -m fork
+
+# Thread processing (TRUE parallel with job control arrays)
+# Bash/WSL:
+./codeaudit.sh -t
+./codeaudit.sh --thread
 ./codeaudit.sh -m thread
 ./codeaudit.sh --mode thread
-./codeaudit.sh --thread
 
-# Subshell processing (parallel with subshells)
+# PowerShell:
+bash codeaudit.sh -t
+bash codeaudit.sh --thread
+bash codeaudit.sh -m thread
+
+# Subshell processing (TRUE parallel with subshell syntax)
+# Bash/WSL:
+./codeaudit.sh -s
+./codeaudit.sh --subshell
 ./codeaudit.sh -m subshell
 ./codeaudit.sh --mode subshell
-./codeaudit.sh --subshell
+
+# PowerShell:
+bash codeaudit.sh -s
+bash codeaudit.sh --subshell
+bash codeaudit.sh -m subshell
 
 # =====================================
-# LOGGING OPTIONS
+# LOGGING OPTIONS (IMPROVED FORMAT)
 # =====================================
 
-# Specify custom log directory
-./codeaudit.sh -l /custom/log/path
-./codeaudit.sh --log /custom/log/path
+# Specify custom log directory (requires admin for system paths)
+# Bash/WSL:
+sudo ./codeaudit.sh -l /custom/log/path
+sudo ./codeaudit.sh --log /custom/log/path
 
-# Use local log directory
+# PowerShell (run as Administrator):
+bash codeaudit.sh -l /custom/log/path
+bash codeaudit.sh --log /custom/log/path
+
+# Use local log directory (no admin required)
+# Bash/WSL:
 ./codeaudit.sh -l .
+
+# PowerShell:
+bash codeaudit.sh -l .
+
+# Note: Log format is now: yyyy-mm-dd-hh-mm-ss : username : INFOS : message
 
 # =====================================
 # ADMINISTRATIVE COMMANDS
 # =====================================
 
-# Restore default settings (requires sudo)
+# Restore default settings (requires sudo/admin)
+# Bash/WSL:
 sudo ./codeaudit.sh -r
 sudo ./codeaudit.sh --restore
 
+# PowerShell (run as Administrator):
+bash codeaudit.sh -r
+bash codeaudit.sh --restore
+
 # =====================================
-# COMBINATION COMMANDS
+# COMBINATION COMMANDS (WITH SIMULTANEOUS OUTPUT)
 # =====================================
 
-# Verbose analysis with HTML output
-./codeaudit.sh -v -f html -o "detailed_report.html"
+# Verbose analysis with HTML output (shows on terminal AND saves to file)
+# Bash/WSL:
+./codeaudit.sh -v --format html -o "detailed_report.html"
+
+# PowerShell:
+bash codeaudit.sh -v --format html -o "detailed_report.html"
 
 # Fork mode with JSON output and verbose logging
-./codeaudit.sh --fork -f json -o "parallel_analysis.json" -v
+# Bash/WSL:
+./codeaudit.sh -f --format json -o "parallel_analysis.json" -v
+
+# PowerShell:
+bash codeaudit.sh -f --format json -o "parallel_analysis.json" -v
 
 # Thread mode with custom directory and HTML output
-./codeaudit.sh -m thread -d /path/to/code -f html -o "thread_report.html"
+# Bash/WSL:
+./codeaudit.sh -t -d /path/to/code --format html -o "thread_report.html"
+
+# PowerShell:
+bash codeaudit.sh -t -d "/mnt/c/path/to/code" --format html -o "thread_report.html"
 
 # Comprehensive analysis with all options
-./codeaudit.sh -d /path/to/code -f json -o "complete_audit.json" -m fork -v -l /tmp/logs
+# Bash/WSL:
+./codeaudit.sh -d /path/to/code --format json -o "complete_audit.json" -f -v -l /tmp/logs
+
+# PowerShell:
+bash codeaudit.sh -d "/mnt/c/path/to/code" --format json -o "complete_audit.json" -f -v -l /tmp/logs
 
 # Multiple directories analysis (one at a time)
-./codeaudit.sh -d /project1 -f json -o "project1_analysis.json"
-./codeaudit.sh -d /project2 -f json -o "project2_analysis.json"
+# Bash/WSL:
+./codeaudit.sh -d /project1 --format json -o "project1_analysis.json"
+./codeaudit.sh -d /project2 --format json -o "project2_analysis.json"
+
+# PowerShell:
+bash codeaudit.sh -d "/mnt/c/project1" --format json -o "project1_analysis.json"
+bash codeaudit.sh -d "/mnt/c/project2" --format json -o "project2_analysis.json"
 
 # Quick security scan
-./codeaudit.sh -d /path/to/code -f text | grep "SECURITY"
+# Bash/WSL:
+./codeaudit.sh -d /path/to/code --format text | grep "SECURITY"
+
+# PowerShell:
+bash codeaudit.sh -d "/mnt/c/path/to/code" --format text | grep "SECURITY"
 
 # Quality issues only
-./codeaudit.sh -d /path/to/code -f text | grep "QUALITY"
+# Bash/WSL:
+./codeaudit.sh -d /path/to/code --format text | grep "QUALITY"
+
+# PowerShell:
+bash codeaudit.sh -d "/mnt/c/path/to/code" --format text | grep "QUALITY"
 
 # =====================================
 # ERROR SCENARIOS AND TROUBLESHOOTING
@@ -153,14 +285,26 @@ sudo ./codeaudit.sh --restore
 ./codeaudit.sh -d ""                       # Empty directory path
 
 # Error 102: Invalid output format
-./codeaudit.sh -f xml                      # Unsupported format
-./codeaudit.sh -f pdf                      # Invalid format
-./codeaudit.sh --format yaml               # Wrong format
+# Bash/WSL:
+./codeaudit.sh --format xml                      # Unsupported format
+./codeaudit.sh --format pdf                      # Invalid format
+./codeaudit.sh --format yaml                     # Wrong format
+
+# PowerShell:
+bash codeaudit.sh --format xml
+bash codeaudit.sh --format pdf
+bash codeaudit.sh --format yaml
 
 # Error 103: Invalid process mode
+# Bash/WSL:
 ./codeaudit.sh -m parallel                 # Wrong mode name
 ./codeaudit.sh --mode async                # Invalid mode
 ./codeaudit.sh -m invalid                  # Unsupported mode
+
+# PowerShell:
+bash codeaudit.sh -m parallel
+bash codeaudit.sh --mode async
+bash codeaudit.sh -m invalid
 
 # Error 104: Error creating output file
 ./codeaudit.sh -o /root/report.txt         # Permission denied (as non-root)
@@ -180,93 +324,196 @@ sudo ./codeaudit.sh --restore
 # TESTING AND VALIDATION COMMANDS
 # =====================================
 
-# Test all output formats
-./codeaudit.sh -f text -o "test_text.txt"
-./codeaudit.sh -f html -o "test_html.html"
-./codeaudit.sh -f json -o "test_json.json"
+# Test all output formats (with simultaneous terminal + file output)
+# Bash/WSL:
+./codeaudit.sh --format text -o "test_text.txt"
+./codeaudit.sh --format html -o "test_html.html"
+./codeaudit.sh --format json -o "test_json.json"
 
-# Test all processing modes
+# PowerShell:
+bash codeaudit.sh --format text -o "test_text.txt"
+bash codeaudit.sh --format html -o "test_html.html"
+bash codeaudit.sh --format json -o "test_json.json"
+
+# Test all parallel processing modes (TRUE implementations)
+# Bash/WSL:
 ./codeaudit.sh -m sequential -o "seq_test.txt"
-./codeaudit.sh -m fork -o "fork_test.txt"
-./codeaudit.sh -m thread -o "thread_test.txt"
-./codeaudit.sh -m subshell -o "subshell_test.txt"
+./codeaudit.sh -f -o "fork_test.txt"           # True fork with PID management
+./codeaudit.sh -t -o "thread_test.txt"         # True thread with job arrays
+./codeaudit.sh -s -o "subshell_test.txt"       # True subshell execution
 
-# Performance comparison
-time ./codeaudit.sh -m sequential -f json -o "seq_benchmark.json"
-time ./codeaudit.sh -m fork -f json -o "fork_benchmark.json"
-time ./codeaudit.sh -m thread -f json -o "thread_benchmark.json"
+# PowerShell:
+bash codeaudit.sh -m sequential -o "seq_test.txt"
+bash codeaudit.sh -f -o "fork_test.txt"
+bash codeaudit.sh -t -o "thread_test.txt"
+bash codeaudit.sh -s -o "subshell_test.txt"
+
+# Performance comparison of parallel modes
+# Bash/WSL:
+time ./codeaudit.sh -m sequential --format json -o "seq_benchmark.json"
+time ./codeaudit.sh -f --format json -o "fork_benchmark.json"
+time ./codeaudit.sh -t --format json -o "thread_benchmark.json"
+time ./codeaudit.sh -s --format json -o "subshell_benchmark.json"
+
+# PowerShell:
+Measure-Command { bash codeaudit.sh -m sequential --format json -o "seq_benchmark.json" }
+Measure-Command { bash codeaudit.sh -f --format json -o "fork_benchmark.json" }
+Measure-Command { bash codeaudit.sh -t --format json -o "thread_benchmark.json" }
+Measure-Command { bash codeaudit.sh -s --format json -o "subshell_benchmark.json" }
 
 # Memory usage monitoring
-/usr/bin/time -v ./codeaudit.sh -m fork -v
+# Bash/WSL:
+/usr/bin/time -v ./codeaudit.sh -f -v
+
+# PowerShell:
+# Use Resource Monitor or Task Manager to monitor bash processes
 
 # =====================================
 # ADVANCED USAGE PATTERNS
 # =====================================
 
 # Continuous monitoring (run periodically)
+# Bash/WSL:
 while true; do
-    ./codeaudit.sh -f json -o "monitor_$(date +%s).json"
+    ./codeaudit.sh --format json -o "monitor_$(date +%s).json"
     sleep 3600  # Wait 1 hour
 done
 
+# PowerShell:
+while ($true) {
+    $timestamp = [int][double]::Parse((Get-Date -UFormat %s))
+    bash codeaudit.sh --format json -o "monitor_$timestamp.json"
+    Start-Sleep 3600
+}
+
 # Batch processing multiple directories
+# Bash/WSL:
 for dir in /project1 /project2 /project3; do
-    ./codeaudit.sh -d "$dir" -f json -o "$(basename $dir)_audit.json"
+    ./codeaudit.sh -d "$dir" --format json -o "$(basename $dir)_audit.json"
 done
 
+# PowerShell:
+$dirs = @("/mnt/c/project1", "/mnt/c/project2", "/mnt/c/project3")
+foreach ($dir in $dirs) {
+    $basename = Split-Path $dir -Leaf
+    bash codeaudit.sh -d $dir --format json -o "$basename`_audit.json"
+}
+
 # Conditional analysis based on file count
+# Bash/WSL:
 file_count=$(find /path/to/code -type f | wc -l)
 if [ $file_count -gt 100 ]; then
-    ./codeaudit.sh -d /path/to/code -m fork -v
+    ./codeaudit.sh -d /path/to/code -f -v    # Use fork for large codebases
 else
     ./codeaudit.sh -d /path/to/code -m sequential -v
 fi
 
-# Filter results for specific languages
-./codeaudit.sh -f json | jq '.codeaudit_report.file_details[] | select(.file | endswith(".js"))'
+# PowerShell:
+$fileCount = (Get-ChildItem -Path "C:\path\to\code" -Recurse -File).Count
+if ($fileCount -gt 100) {
+    bash codeaudit.sh -d "/mnt/c/path/to/code" -f -v
+} else {
+    bash codeaudit.sh -d "/mnt/c/path/to/code" -m sequential -v
+}
+
+# Filter results for specific languages (requires jq)
+# Bash/WSL:
+./codeaudit.sh --format json | jq '.codeaudit_report.file_details[] | select(.file | endswith(".js"))'
+
+# PowerShell (if jq is available):
+bash codeaudit.sh --format json | jq '.codeaudit_report.file_details[] | select(.file | endswith(".js"))'
 
 # Count issues by type
-./codeaudit.sh -f text | grep "SECURITY:" | wc -l
-./codeaudit.sh -f text | grep "QUALITY:" | wc -l
+# Bash/WSL:
+./codeaudit.sh --format text | grep "SECURITY:" | wc -l
+./codeaudit.sh --format text | grep "QUALITY:" | wc -l
+
+# PowerShell:
+(bash codeaudit.sh --format text | Select-String "SECURITY:").Count
+(bash codeaudit.sh --format text | Select-String "QUALITY:").Count
 
 # =====================================
 # DEBUGGING AND DIAGNOSTIC COMMANDS
 # =====================================
 
 # Debug mode (shows detailed execution info)
+# Bash/WSL:
 bash -x ./codeaudit.sh -v
 
+# PowerShell:
+bash -x codeaudit.sh -v
+
 # Check script permissions
+# Bash/WSL:
 ls -la ./codeaudit.sh
 
-# Verify dependencies
+# PowerShell:
+Get-ChildItem codeaudit.sh | Select-Object Mode, LastWriteTime, Length, Name
+
+# Verify dependencies and environment
+# Bash/WSL:
 which bash
 echo $BASH_VERSION
 
+# PowerShell:
+Get-Command bash
+bash --version
+
 # Test with minimal example
+# Bash/WSL:
 mkdir test_dir && echo "console.log('test');" > test_dir/test.js
 ./codeaudit.sh -d test_dir -v
 rm -rf test_dir
+
+# PowerShell:
+New-Item -ItemType Directory -Path "test_dir" -Force
+"console.log('test');" | Out-File -FilePath "test_dir\test.js" -Encoding UTF8
+bash codeaudit.sh -d test_dir -v
+Remove-Item -Recurse -Force test_dir
 
 # =====================================
 # INTEGRATION EXAMPLES
 # =====================================
 
 # CI/CD pipeline integration
-./codeaudit.sh -f json -o "ci_report.json" && \
+# Bash/WSL:
+./codeaudit.sh --format json -o "ci_report.json" && \
 if [ $(jq '.codeaudit_report.summary.issues_found' ci_report.json) -gt 0 ]; then
     echo "Issues found - failing build"
     exit 1
 fi
 
+# PowerShell:
+bash codeaudit.sh --format json -o "ci_report.json"
+if ($LASTEXITCODE -eq 0) {
+    $issues = (Get-Content "ci_report.json" | ConvertFrom-Json).codeaudit_report.summary.issues_found
+    if ($issues -gt 0) {
+        Write-Host "Issues found - failing build"
+        exit 1
+    }
+}
+
 # Git hook integration
+# Bash/WSL:
 git diff --name-only HEAD~1 HEAD | xargs dirname | sort -u | while read dir; do
-    ./codeaudit.sh -d "$dir" -f text
+    ./codeaudit.sh -d "$dir" --format text
 done
 
+# PowerShell:
+$changedDirs = git diff --name-only HEAD~1 HEAD | ForEach-Object { Split-Path $_ -Parent } | Sort-Object -Unique
+foreach ($dir in $changedDirs) {
+    bash codeaudit.sh -d $dir --format text
+}
+
 # Generate reports for documentation
-./codeaudit.sh -f html -o "docs/security_audit.html"
-./codeaudit.sh -f json -o "reports/$(date +%Y-%m-%d)_audit.json"
+# Bash/WSL:
+./codeaudit.sh --format html -o "docs/security_audit.html"
+./codeaudit.sh --format json -o "reports/$(date +%Y-%m-%d)_audit.json"
+
+# PowerShell:
+bash codeaudit.sh --format html -o "docs/security_audit.html"
+$date = Get-Date -Format "yyyy-MM-dd"
+bash codeaudit.sh --format json -o "reports/$date`_audit.json"
 
 # =====================================
 # WINDOWS/WSL SPECIFIC COMMANDS
@@ -274,22 +521,97 @@ done
 
 # Run through WSL on Windows
 wsl bash ./codeaudit.sh -v
+wsl bash codeaudit.sh -v
 
-# Windows paths (converted to WSL paths)
-wsl bash ./codeaudit.sh -d "/mnt/c/Users/admin/Documents/code"
+# Windows paths (converted to WSL paths automatically)
+# Analyze Windows directories from PowerShell:
+bash codeaudit.sh -d "/mnt/c/Users/admin/Documents/code"
+bash codeaudit.sh -d "/mnt/c/project/src"
 
-# Handle Windows line endings
+# Handle Windows line endings (if needed)
+# In WSL/Bash:
 dos2unix ./codeaudit.sh  # Convert if needed
-wsl bash ./codeaudit.sh
+unix2dos ./codeaudit.sh  # Convert back if needed
+
+# PowerShell equivalent (using WSL):
+wsl dos2unix codeaudit.sh
+wsl unix2dos codeaudit.sh
+
+# Run with elevated privileges on Windows
+# PowerShell (Run as Administrator):
+bash codeaudit.sh -r        # Restore defaults
+bash codeaudit.sh -l "/var/log/codeaudit"  # System log directory
 
 # =====================================
-# NOTES AND BEST PRACTICES
+# REAL-WORLD EXAMPLES WITH CURRENT FIXES
 # =====================================
+
+# Example 1: Full security audit with parallel processing
+# PowerShell:
+bash codeaudit.sh -f -v --format html -o "security_audit_$(Get-Date -Format 'yyyy-MM-dd').html"
+
+# Example 2: Compare parallel mode performance
+# PowerShell:
+Write-Host "Testing Sequential Mode:"
+Measure-Command { bash codeaudit.sh -m sequential --format json -o "seq_test.json" }
+Write-Host "Testing Fork Mode:"
+Measure-Command { bash codeaudit.sh -f --format json -o "fork_test.json" }
+Write-Host "Testing Thread Mode:"
+Measure-Command { bash codeaudit.sh -t --format json -o "thread_test.json" }
+Write-Host "Testing Subshell Mode:"
+Measure-Command { bash codeaudit.sh -s --format json -o "subshell_test.json" }
+
+# Example 3: Automated daily security scan
+# PowerShell script for scheduled task:
+$date = Get-Date -Format "yyyy-MM-dd"
+$logFile = "daily_scan_$date.log"
+bash codeaudit.sh -f -v --format json -o "daily_audit_$date.json" *> $logFile
+
+# =====================================
+# NOTES AND BEST PRACTICES (UPDATED)
+# =====================================
+
+# CRITICAL FIXES IMPLEMENTED:
+# ✅ Logging format: Now uses yyyy-mm-dd-hh-mm-ss : username : INFOS : message
+# ✅ Parallel processing: TRUE implementations for fork/thread/subshell modes
+# ✅ Simultaneous output: Uses tee to output to BOTH terminal AND file
+# ✅ Short options: -f (fork), -t (thread), -s (subshell) fully supported
+# ✅ Error handling: Automatically shows help after each error
+# ✅ Admin privileges: Clearly documented for -r and -l options
+
+# PERFORMANCE NOTES:
+# - Fork mode (-f): Best for CPU-intensive tasks, true process isolation
+# - Thread mode (-t): Best for I/O-heavy tasks, shared memory space
+# - Subshell mode (-s): Best for independent operations, clean environment
+# - Sequential mode: Best for debugging and small codebases
+
+# PLATFORM NOTES:
+# - Windows: Always use 'bash codeaudit.sh' or WSL
+# - Linux/macOS: Can use './codeaudit.sh' directly
+# - WSL: Handles Windows path conversion automatically
+
+# OUTPUT RECOMMENDATIONS:
+# - Use JSON for automation and CI/CD integration
+# - Use HTML for human-readable reports and documentation
+# - Use TEXT for quick terminal viewing and grep filtering
+# - All formats support simultaneous terminal + file output
+
+# SECURITY NOTES:
+# - Admin privileges only required for -r (restore) and -l (system logs)
+# - Log files contain timestamps and usernames for audit trails
+# - Parallel modes are safe and don't interfere with each other
+
+# TROUBLESHOOTING:
+# - If script won't run: Check file permissions and line endings
+# - If no output: Check target directory exists and is readable
+# - If parallel modes slow: Reduce file count or use sequential mode
+# - If permission errors: Use appropriate sudo/admin privileges
 
 # Note: Some commands above may produce errors intentionally for testing
 # Always ensure you have appropriate permissions before running
-# Use 'sudo' commands carefully and only when necessary
-# For large codebases, consider using fork or thread modes
+# Use 'sudo' commands carefully and only when necessary  
+# For large codebases, fork/thread/subshell modes provide significant speedup
 # JSON output is best for automation and integration
 # HTML output is best for human-readable reports
 # Use verbose mode (-v) for debugging and detailed information
+# The -o option now provides simultaneous terminal AND file output (major improvement)

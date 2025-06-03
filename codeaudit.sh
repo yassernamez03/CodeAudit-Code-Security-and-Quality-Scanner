@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 # CodeAudit - Code Quality and Security Analysis Tool
 # For Operating Systems Module Mini Project
 # Compatible with Windows PowerShell and Unix/Linux systems
@@ -82,10 +82,16 @@ handle_error() {
     echo -e "${RED}Error $error_code:${NC} $message" >&2
     log_message "ERROR" "Code $error_code: $message"
     
-    # Write to history log if available and writable
-    if [[ -n "$HISTORY_LOG" && -f "$HISTORY_LOG" && -w "$HISTORY_LOG" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR $error_code: $message" >> "$HISTORY_LOG"
+    # Write to history log if available
+    if [[ -w "$HISTORY_LOG" ]]; then
+        local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+        local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+        echo "$timestamp : $username : ERROR : Code $error_code: $message" >> "$HISTORY_LOG"
     fi
+    
+    # Show help after error
+    echo >&2
+    show_help >&2
     
     exit "$error_code"
 }
@@ -99,40 +105,42 @@ check_admin_privileges() {
 
 # History log setup function
 setup_history_log() {
-    # Try to create log directory if it doesn't exist
+    # Create log directory if it doesn't exist
     if [[ ! -d "$LOG_DIR" ]]; then
         if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
-            # If we can't create the system log directory, use local directory
-            echo -e "${YELLOW}Warning:${NC} Cannot create $LOG_DIR. Using local directory." >&2
-            LOG_DIR="$SCRIPT_DIR"
-            HISTORY_LOG="$SCRIPT_DIR/history.log"
+            if [[ $EUID -eq 0 ]]; then
+                mkdir -p "$LOG_DIR" || handle_error 106 "Cannot create log directory $LOG_DIR"
+            else
+                echo -e "${YELLOW}Warning:${NC} Cannot create $LOG_DIR. Using local directory." >&2
+                HISTORY_LOG="$SCRIPT_DIR/history.log"
+                return
+            fi
         fi
-    fi
-    
-    # If still using system path, update HISTORY_LOG
-    if [[ "$LOG_DIR" != "$SCRIPT_DIR" ]]; then
-        HISTORY_LOG="$LOG_DIR/history.log"
     fi
     
     # Create history log file if it doesn't exist
     if [[ ! -f "$HISTORY_LOG" ]]; then
         if ! touch "$HISTORY_LOG" 2>/dev/null; then
-            # Final fallback to local directory
-            HISTORY_LOG="$SCRIPT_DIR/history.log"
-            touch "$HISTORY_LOG" || handle_error 106 "Cannot create local log file"
+            if [[ $EUID -eq 0 ]]; then
+                touch "$HISTORY_LOG" || handle_error 106 "Cannot create log file $HISTORY_LOG"
+            else
+                echo -e "${YELLOW}Warning:${NC} Cannot create $HISTORY_LOG. Using local directory." >&2
+                HISTORY_LOG="$SCRIPT_DIR/history.log"
+                touch "$HISTORY_LOG" || handle_error 106 "Cannot create local log file"
+            fi
         fi
     fi
     
-    # Ensure proper permissions if we have root access
+    # Ensure proper permissions
     if [[ $EUID -eq 0 && -f "$HISTORY_LOG" ]]; then
-        chmod 644 "$HISTORY_LOG" 2>/dev/null
-        chown root:root "$HISTORY_LOG" 2>/dev/null
+        chmod 644 "$HISTORY_LOG"
+        chown root:root "$HISTORY_LOG"
     fi
     
-    # Write startup entry to history log
-    if [[ -w "$HISTORY_LOG" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting CodeAudit v$VERSION" >> "$HISTORY_LOG"
-    fi
+    # Write startup entry
+    local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+    local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+    echo "$timestamp : $username : INFOS : Starting CodeAudit v$VERSION" >> "$HISTORY_LOG"
 }
 
 # Global variables for statistics
@@ -146,18 +154,19 @@ PARALLEL_MAX_PROCS=4 # Default, will be updated in main
 log_message() {
     local level="$1"
     local message="$2"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
-    if [[ "$VERBOSE" == true ]]; then
-        echo -e "${BLUE}[$level]${NC} $message" >&2
+    local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+    local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+    
+    # Convert INFO to INFOS, keep ERROR as is
+    if [[ "$level" == "INFO" ]]; then
+        level="INFOS"
     fi
-}
-
-# History logging function
-log_to_history() {
-    local message="$1"
-    if [[ -n "$HISTORY_LOG" && -f "$HISTORY_LOG" && -w "$HISTORY_LOG" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$HISTORY_LOG"
+    
+    local log_entry="$timestamp : $username : $level : $message"
+    echo "$log_entry" >> "$LOG_FILE"
+    
+    if [[ "$VERBOSE" == true ]]; then
+        echo -e "${BLUE}$timestamp : $username : $level : $message${NC}" >&2
     fi
 }
 
@@ -172,21 +181,21 @@ USAGE:
 OPTIONS:
     -h, --help              Display this help message
     -v, --verbose           Enable verbose output
-    -f, --format FORMAT     Output format (text, html, json) [default: text]
+    -f, --fork              Use fork mode for parallel processing
+    -t, --thread            Use thread mode for parallel processing  
+    -s, --subshell          Use subshell mode for parallel processing
+    --format FORMAT         Output format (text, html, json) [default: text]
     -o, --output FILE       Output file (default: stdout)
     -m, --mode MODE         Process mode (sequential, fork, subshell, thread) [default: sequential]
     -d, --directory DIR     Target directory to analyze [default: $DEFAULT_TARGET]
-    --fork                  Use fork mode for parallel processing
-    --thread                Use thread mode for parallel processing
-    --subshell              Use subshell mode for parallel processing
-    -l, --log DIR           Log files directory [default: $DEFAULT_LOG_DIR]
-    -r, --restore           Restore default settings (requires sudo)
+    -l, --log DIR           Log files directory [default: $DEFAULT_LOG_DIR] (requires admin)
+    -r, --restore           Restore default settings (requires admin)
 
 EXAMPLES:
     $0                                    # Analyze default directory
-    $0 -v -f json -o report.json         # Detailed JSON output
-    $0 -d /path/to/code --fork            # Analyze specific directory in fork mode
-    $0 -m thread -v                       # Thread mode with verbose output
+    $0 -v --format json -o report.json   # Detailed JSON output
+    $0 -d /path/to/code -f                # Analyze specific directory in fork mode
+    $0 -t -v                              # Thread mode with verbose output
     sudo $0 -r                            # Restore default settings
 
 OUTPUT FORMATS:
@@ -196,9 +205,13 @@ OUTPUT FORMATS:
 
 PROCESS MODES:
     sequential  Sequential processing (default)
-    fork        Parallel processing with fork
-    thread      Parallel processing with threads
-    subshell    Parallel processing with subshells
+    fork        Parallel processing with fork (-f)
+    thread      Parallel processing with threads (-t)
+    subshell    Parallel processing with subshells (-s)
+
+ADMINISTRATOR PRIVILEGES REQUIRED FOR:
+    -r, --restore           Restore default settings
+    -l, --log               Creating log directories in system locations
 
 For more information, consult the project documentation.
 EOF
@@ -222,7 +235,9 @@ restore_defaults() {
     setup_history_log
     
     echo -e "${GREEN}Default settings restored successfully.${NC}"
-    log_to_history "Default settings restored successfully"
+    local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+    local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+    echo "$timestamp : $username : INFOS : Default settings restored" >> "$HISTORY_LOG"
     
     exit 0
 }
@@ -239,9 +254,21 @@ parse_arguments() {
                 VERBOSE=true
                 shift
                 ;;
-            -f|--format)
+            -f|--fork)
+                PROCESS_MODE="fork"
+                shift
+                ;;
+            -t|--thread)
+                PROCESS_MODE="thread"
+                shift
+                ;;
+            -s|--subshell)
+                PROCESS_MODE="subshell"
+                shift
+                ;;
+            --format)
                 if [[ -z "$2" ]]; then
-                    handle_error 100 "Option -f requires an argument"
+                    handle_error 100 "Option --format requires an argument"
                 fi
                 OUTPUT_FORMAT="$2"
                 shift 2
@@ -271,24 +298,16 @@ parse_arguments() {
                 if [[ -z "$2" ]]; then
                     handle_error 100 "Option -l requires an argument"
                 fi
+                # Check admin privileges for log directory creation
+                if [[ "$2" != "$SCRIPT_DIR"* && $EUID -ne 0 ]]; then
+                    handle_error 105 "Option -l requires administrator privileges for system log directories"
+                fi
                 LOG_DIR="$2"
                 HISTORY_LOG="$LOG_DIR/history.log"
                 shift 2
                 ;;
             -r|--restore)
                 RESTORE_DEFAULTS=true
-                shift
-                ;;
-            --fork)
-                PROCESS_MODE="fork"
-                shift
-                ;;
-            --thread)
-                PROCESS_MODE="thread"
-                shift
-                ;;
-            --subshell)
-                PROCESS_MODE="subshell"
                 shift
                 ;;
             -*)
@@ -541,53 +560,130 @@ process_files() {
                 fi
             done
             ;;
-        "fork"|"subshell"|"thread")
-            local job_pids=()
-            local current_jobs=0
+        "fork")
+            # Fork mode: Use explicit PID management and process forking
+            local fork_pids=()
+            local current_forks=0
+            
             for file in "${files[@]}"; do
-                (analyze_file "$file" >> "$TMP_COUNTS_FILE") &
-                job_pids+=($!) # Store background job PID
-                ((current_jobs++))
-                
-                echo "DEBUG: Job started for $file. Current jobs: $current_jobs" >&2
+                # Create a fork using explicit fork syntax
+                if (
+                    # This runs in a forked child process
+                    analyze_file "$file" >> "$TMP_COUNTS_FILE"
+                    exit 0
+                ) & then
+                    fork_pids+=($!) # Store child process PID
+                    ((current_forks++))
+                    
+                    echo "DEBUG: Fork created for $file with PID $!. Current forks: $current_forks" >&2
 
-                if (( current_jobs >= PARALLEL_MAX_PROCS )); then
-                    echo "DEBUG: Maximum processes ($PARALLEL_MAX_PROCS) reached. Waiting for a job to finish..." >&2
-                    wait -n # Wait for a background job to finish
-                    ((current_jobs--))
-                    echo "DEBUG: One job finished. Current jobs: $current_jobs" >&2
+                    if (( current_forks >= PARALLEL_MAX_PROCS )); then
+                        echo "DEBUG: Maximum forks ($PARALLEL_MAX_PROCS) reached. Waiting for a process to finish..." >&2
+                        # Wait for any child process to finish
+                        wait -n
+                        ((current_forks--))
+                        echo "DEBUG: One fork finished. Current forks: $current_forks" >&2
+                    fi
                 fi
             done
             
-            echo "DEBUG: All files submitted. Waiting for ${#job_pids[@]} remaining jobs..." >&2
-            wait # Wait for all remaining background jobs associated with this shell
-            echo "DEBUG: All background jobs finished." >&2
-
-            # Aggregate results from TMP_COUNTS_FILE
-            if [[ -f "$TMP_COUNTS_FILE" ]]; then
-                echo "DEBUG: Aggregating results from TMP_COUNTS_FILE ($TMP_COUNTS_FILE):" >&2
-                cat "$TMP_COUNTS_FILE" >&2
-                echo "DEBUG: --- End of TMP_COUNTS_FILE content ---" >&2
+            echo "DEBUG: All files forked. Waiting for ${#fork_pids[@]} remaining child processes..." >&2
+            # Wait for all child processes to complete
+            for pid in "${fork_pids[@]}"; do
+                wait "$pid"
+            done
+            echo "DEBUG: All fork processes finished." >&2
+            ;;
+        "thread")
+            # Thread mode: Use proper job control with job arrays
+            local thread_jobs=()
+            local current_threads=0
+            
+            for file in "${files[@]}"; do
+                # Start background job (simulating thread)
+                {
+                    analyze_file "$file" >> "$TMP_COUNTS_FILE"
+                } &
+                thread_jobs+=($!) # Store job PID
+                ((current_threads++))
                 
-                local line_num=0
-                while IFS=':' read -r processed_flag file_sec_issues file_qual_issues || { [[ -n "$processed_flag" ]] && break; }; do
-                    ((line_num++))
-                    echo "DEBUG: Line $line_num from TMP_COUNTS_FILE: P='$processed_flag', S='$file_sec_issues', Q='$file_qual_issues'" >&2
-                    if [[ "$processed_flag" == "1" && -n "$file_sec_issues" && -n "$file_qual_issues" ]]; then
-                        TOTAL_FILES_PROCESSED=$((TOTAL_FILES_PROCESSED + 1))
-                        AGGREGATED_SECURITY_ISSUES=$((AGGREGATED_SECURITY_ISSUES + file_sec_issues))
-                        AGGREGATED_QUALITY_ISSUES=$((AGGREGATED_QUALITY_ISSUES + file_qual_issues))
-                        echo "DEBUG: Counters updated: TFP=$TOTAL_FILES_PROCESSED, ASI=$AGGREGATED_SECURITY_ISSUES, AQI=$AGGREGATED_QUALITY_ISSUES" >&2
-                    else
-                        echo "DEBUG: Line $line_num ignored due to invalid data: P='$processed_flag', S='$file_sec_issues', Q='$file_qual_issues'" >&2
-                    fi
-                done < "$TMP_COUNTS_FILE"
-                echo "DEBUG: TMP_COUNTS_FILE reading completed. Final counters in process_files: TFP=$TOTAL_FILES_PROCESSED, ASI=$AGGREGATED_SECURITY_ISSUES, AQI=$AGGREGATED_QUALITY_ISSUES" >&2
-            else
-                echo "DEBUG: TMP_COUNTS_FILE ($TMP_COUNTS_FILE) not found or empty after jobs." >&2
-            fi
+                echo "DEBUG: Thread job started for $file with job ID $!. Current threads: $current_threads" >&2
+
+                if (( current_threads >= PARALLEL_MAX_PROCS )); then
+                    echo "DEBUG: Maximum threads ($PARALLEL_MAX_PROCS) reached. Waiting for a job to finish..." >&2
+                    # Wait for any background job to finish
+                    wait -n
+                    ((current_threads--))
+                    echo "DEBUG: One thread job finished. Current threads: $current_threads" >&2
+                fi
+            done
+            
+            echo "DEBUG: All thread jobs started. Waiting for ${#thread_jobs[@]} remaining jobs..." >&2
+            # Wait for all background jobs to complete
+            for job_id in "${thread_jobs[@]}"; do
+                wait "$job_id"
+            done
+            echo "DEBUG: All thread jobs finished." >&2
+            ;;
+        "subshell")
+            # Subshell mode: Use ( ) syntax for true subshell execution
+            local subshell_pids=()
+            local current_subshells=0
+            
+            for file in "${files[@]}"; do
+                # Use true subshell syntax with ( )
+                (
+                    # This runs in a true subshell environment
+                    analyze_file "$file" >> "$TMP_COUNTS_FILE"
+                ) &
+                subshell_pids+=($!) # Store subshell PID
+                ((current_subshells++))
+                
+                echo "DEBUG: Subshell started for $file with PID $!. Current subshells: $current_subshells" >&2
+
+                if (( current_subshells >= PARALLEL_MAX_PROCS )); then
+                    echo "DEBUG: Maximum subshells ($PARALLEL_MAX_PROCS) reached. Waiting for one to finish..." >&2
+                    # Wait for any subshell to finish
+                    wait -n
+                    ((current_subshells--))
+                    echo "DEBUG: One subshell finished. Current subshells: $current_subshells" >&2
+                fi
+            done
+            
+            echo "DEBUG: All subshells started. Waiting for ${#subshell_pids[@]} remaining subshells..." >&2
+            # Wait for all subshells to complete
+            for pid in "${subshell_pids[@]}"; do
+                wait "$pid"
+            done
+            echo "DEBUG: All subshells finished." >&2
             ;;
     esac
+
+    # Aggregate results from TMP_COUNTS_FILE for all parallel modes
+    if [[ "$PROCESS_MODE" != "sequential" ]]; then
+        if [[ -f "$TMP_COUNTS_FILE" ]]; then
+            echo "DEBUG: Aggregating results from TMP_COUNTS_FILE ($TMP_COUNTS_FILE):" >&2
+            cat "$TMP_COUNTS_FILE" >&2
+            echo "DEBUG: --- End of TMP_COUNTS_FILE content ---" >&2
+            
+            local line_num=0
+            while IFS=':' read -r processed_flag file_sec_issues file_qual_issues || { [[ -n "$processed_flag" ]] && break; }; do
+                ((line_num++))
+                echo "DEBUG: Line $line_num from TMP_COUNTS_FILE: P='$processed_flag', S='$file_sec_issues', Q='$file_qual_issues'" >&2
+                if [[ "$processed_flag" == "1" && -n "$file_sec_issues" && -n "$file_qual_issues" ]]; then
+                    TOTAL_FILES_PROCESSED=$((TOTAL_FILES_PROCESSED + 1))
+                    AGGREGATED_SECURITY_ISSUES=$((AGGREGATED_SECURITY_ISSUES + file_sec_issues))
+                    AGGREGATED_QUALITY_ISSUES=$((AGGREGATED_QUALITY_ISSUES + file_qual_issues))
+                    echo "DEBUG: Counters updated: TFP=$TOTAL_FILES_PROCESSED, ASI=$AGGREGATED_SECURITY_ISSUES, AQI=$AGGREGATED_QUALITY_ISSUES" >&2
+                else
+                    echo "DEBUG: Line $line_num ignored due to invalid data: P='$processed_flag', S='$file_sec_issues', Q='$file_qual_issues'" >&2
+                fi
+            done < "$TMP_COUNTS_FILE"
+            echo "DEBUG: TMP_COUNTS_FILE reading completed. Final counters in process_files: TFP=$TOTAL_FILES_PROCESSED, ASI=$AGGREGATED_SECURITY_ISSUES, AQI=$AGGREGATED_QUALITY_ISSUES" >&2
+        else
+            echo "DEBUG: TMP_COUNTS_FILE ($TMP_COUNTS_FILE) not found or empty after jobs." >&2
+        fi
+    fi
 
     AGGREGATED_ISSUES_FOUND=$((AGGREGATED_SECURITY_ISSUES + AGGREGATED_QUALITY_ISSUES))
     echo "DEBUG: process_files completed. AGGREGATED_ISSUES_FOUND=$AGGREGATED_ISSUES_FOUND" >&2
@@ -809,10 +905,14 @@ main() {
 
     log_message "INFO" "Starting CodeAudit analysis"
     log_message "INFO" "Target: $TARGET_DIR, Format: $OUTPUT_FORMAT, Mode: $PROCESS_MODE"
-    log_to_history "Analysis started - Target: $TARGET_DIR, Format: $OUTPUT_FORMAT, Mode: $PROCESS_MODE"
 
+    # Set up output redirection for simultaneous terminal and file output
     if [[ -n "$OUTPUT_FILE" ]]; then
-        exec > "$OUTPUT_FILE"
+        # Use tee to output to both terminal and file simultaneously
+        exec > >(tee "$OUTPUT_FILE")
+        # Also log the output file creation
+        echo -e "${GREEN}Output will be written to both terminal and file: $OUTPUT_FILE${NC}" >&2
+        log_message "INFO" "Output redirected to both terminal and file: $OUTPUT_FILE"
     fi
 
     process_files 
@@ -820,10 +920,9 @@ main() {
     generate_output 
 
     log_message "INFO" "Analysis completed. Files: $TOTAL_FILES_PROCESSED, Issues: $AGGREGATED_ISSUES_FOUND"
-    log_to_history "Analysis completed - Files: $TOTAL_FILES_PROCESSED, Security Issues: $AGGREGATED_SECURITY_ISSUES, Quality Issues: $AGGREGATED_QUALITY_ISSUES"
 
     if [[ -n "$OUTPUT_FILE" ]]; then
-        echo -e "${GREEN}Analysis complete!${NC} Results written to: $OUTPUT_FILE" >&2
+        echo -e "${GREEN}Analysis complete!${NC} Results written to both terminal and file: $OUTPUT_FILE" >&2
         echo -e "Files analyzed: $TOTAL_FILES_PROCESSED, Issues found: $AGGREGATED_ISSUES_FOUND" >&2
     fi
     # No explicit rm here, trap will handle it.

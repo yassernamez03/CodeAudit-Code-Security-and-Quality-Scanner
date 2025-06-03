@@ -21,3 +21,9 @@
 2025-06-03 01:17:15 - ERROR 103: Invalid process mode - Invalid process mode 'invalid'. Use: sequential, fork, subshell, thread
 2025-06-03 01:17:15 - Starting CodeAudit v2.0.0
 2025-06-03 01:17:15 - ERROR 103: Invalid process mode - Invalid process mode 'invalid'. Use: sequential, fork, subshell, thread
+2025-06-03 01:29:10 - ERROR 103: Invalid process mode - Invalid process mode 'invalid'. Use: sequential, fork, subshell, thread
+2025-06-03-01-40-22 : yasser : ERROR : Code 101: Target directory not found - Target directory '/nonexistent/directory' does not exist
+2025-06-03-01-41-42 : yasser : ERROR : Code 103: Invalid process mode - Invalid process mode 'invalid'. Use: sequential, fork, subshell, thread
+2025-06-03-08-40-45 : yasser : ERROR : Code 103: Invalid process mode - Invalid process mode 'invalid'. Use: sequential, fork, subshell, thread
+2025-06-03-08-40-50 : yasser : ERROR : Code 103: Invalid process mode - Invalid process mode 'invalid'. Use: sequential, fork, subshell, thread
+2025-06-03-08-41-35 : yasser : ERROR : Code 105: Administrator privileges required - Option -l requires administrator privileges for system log directories

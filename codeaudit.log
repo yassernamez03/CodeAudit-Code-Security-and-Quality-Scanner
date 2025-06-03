@@ -1,2 +1,14 @@
-CodeAudit v2.0.0 started at Tue Jun  3 01:17:15 AM +01 2025
-[2025-06-03 01:17:15] [ERROR] Code 103: Invalid process mode - Invalid process mode 'invalid'. Use: sequential, fork, subshell, thread
+CodeAudit v2.0.0 started at Tue Jun  3 09:27:20 AM +01 2025
+2025-06-03-09-27-20 : yasser : INFOS : Starting CodeAudit analysis
+2025-06-03-09-27-20 : yasser : INFOS : Target: /mnt/c/Users/admin/Downloads/Project SE/mini_project, Format: text, Mode: sequential
+2025-06-03-09-27-20 : yasser : INFOS : Found 8 files to analyze in sequential mode with 4 maximum processes.
+2025-06-03-09-27-20 : yasser : INFOS : Analyzing file: /mnt/c/Users/admin/Downloads/Project SE/mini_project/app.js (Language: javascript)
+2025-06-03-09-27-20 : yasser : INFOS : Analyzing file: /mnt/c/Users/admin/Downloads/Project SE/mini_project/config.php (Language: php)
+2025-06-03-09-27-20 : yasser : INFOS : Analyzing file: /mnt/c/Users/admin/Downloads/Project SE/mini_project/index.html (Language: html)
+2025-06-03-09-27-20 : yasser : INFOS : Analyzing file: /mnt/c/Users/admin/Downloads/Project SE/mini_project/main.c (Language: c)
+2025-06-03-09-27-20 : yasser : INFOS : Analyzing file: /mnt/c/Users/admin/Downloads/Project SE/mini_project/process.py (Language: python)
+2025-06-03-09-27-20 : yasser : INFOS : Analyzing file: /mnt/c/Users/admin/Downloads/Project SE/mini_project/requirements.txt (Language: unknown)
+2025-06-03-09-27-20 : yasser : INFOS : Skipping file with unknown language: /mnt/c/Users/admin/Downloads/Project SE/mini_project/requirements.txt
+2025-06-03-09-27-20 : yasser : INFOS : Analyzing file: /mnt/c/Users/admin/Downloads/Project SE/mini_project/setup.sh (Language: shell)
+2025-06-03-09-27-21 : yasser : INFOS : Analyzing file: /mnt/c/Users/admin/Downloads/Project SE/mini_project/styles.css (Language: css)
+2025-06-03-09-27-21 : yasser : INFOS : Analysis completed. Files: 7, Issues: 7
