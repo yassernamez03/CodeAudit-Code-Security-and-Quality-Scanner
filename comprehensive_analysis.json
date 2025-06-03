@@ -1,0 +1,38 @@
+{
+    "codeaudit_report": {
+        "version": "2.0.0",
+        "timestamp": "2025-06-03T12:21:56+01:00",
+        "target_directory": "/mnt/c/Users/admin/Downloads/Project SE/mini_project",
+        "process_mode": "sequential",
+        "summary": {
+            "files_analyzed": 7,
+            "issues_found": 7,
+            "security_issues": 4,
+            "quality_issues": 3
+        },
+        "file_details": [
+            {
+                "file": "/mnt/c/Users/admin/Downloads/Project SE/mini_project/app.js",
+                "issues": [
+                    "SECURITY: Hardcoded password detected",
+                    "SECURITY: Loose equality operator (use === instead)",
+                    "QUALITY: Debug console.log statements found"
+                ]
+            },
+            {
+                "file": "/mnt/c/Users/admin/Downloads/Project SE/mini_project/main.c",
+                "issues": [
+                    "SECURITY: Potential memory leak (malloc without free)"
+                ]
+            },
+            {
+                "file": "/mnt/c/Users/admin/Downloads/Project SE/mini_project/process.py",
+                "issues": [
+                    "SECURITY: Dangerous function usage (eval/exec/os.system)",
+                    "QUALITY: Lines exceeding 120 characters detected",
+                    "QUALITY: TODO/FIXME comments found"
+                ]
+            }
+        ]
+    }
+}

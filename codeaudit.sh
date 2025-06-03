@@ -105,6 +105,18 @@ check_admin_privileges() {
 
 # History log setup function
 setup_history_log() {
+    # Handle local directory case first
+    if [[ "$LOG_DIR" == "$SCRIPT_DIR" || "$LOG_DIR" == "." ]]; then
+        LOG_DIR="$SCRIPT_DIR"
+        HISTORY_LOG="$SCRIPT_DIR/history.log"
+    fi
+    
+    # Debug output
+    if [[ "$VERBOSE" == true ]]; then
+        echo "DEBUG: LOG_DIR = $LOG_DIR" >&2
+        echo "DEBUG: HISTORY_LOG = $HISTORY_LOG" >&2
+    fi
+    
     # Create log directory if it doesn't exist
     if [[ ! -d "$LOG_DIR" ]]; then
         if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
@@ -112,8 +124,8 @@ setup_history_log() {
                 mkdir -p "$LOG_DIR" || handle_error 106 "Cannot create log directory $LOG_DIR"
             else
                 echo -e "${YELLOW}Warning:${NC} Cannot create $LOG_DIR. Using local directory." >&2
+                LOG_DIR="$SCRIPT_DIR"
                 HISTORY_LOG="$SCRIPT_DIR/history.log"
-                return
             fi
         fi
     fi
@@ -121,17 +133,14 @@ setup_history_log() {
     # Create history log file if it doesn't exist
     if [[ ! -f "$HISTORY_LOG" ]]; then
         if ! touch "$HISTORY_LOG" 2>/dev/null; then
-            if [[ $EUID -eq 0 ]]; then
-                touch "$HISTORY_LOG" || handle_error 106 "Cannot create log file $HISTORY_LOG"
-            else
-                echo -e "${YELLOW}Warning:${NC} Cannot create $HISTORY_LOG. Using local directory." >&2
-                HISTORY_LOG="$SCRIPT_DIR/history.log"
-                touch "$HISTORY_LOG" || handle_error 106 "Cannot create local log file"
-            fi
+            handle_error 106 "Cannot create log file $HISTORY_LOG"
+        fi
+        if [[ "$VERBOSE" == true ]]; then
+            echo "DEBUG: Created new history log file: $HISTORY_LOG" >&2
         fi
     fi
     
-    # Ensure proper permissions
+    # Ensure proper permissions (only if running as root)
     if [[ $EUID -eq 0 && -f "$HISTORY_LOG" ]]; then
         chmod 644 "$HISTORY_LOG"
         chown root:root "$HISTORY_LOG"
@@ -141,6 +150,12 @@ setup_history_log() {
     local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
     local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
     echo "$timestamp : $username : INFOS : Starting CodeAudit v$VERSION" >> "$HISTORY_LOG"
+    
+    # Debug output for verification
+    if [[ "$VERBOSE" == true ]]; then
+        echo "DEBUG: History log will be written to: $HISTORY_LOG" >&2
+        echo "DEBUG: Wrote startup entry to history log" >&2
+    fi
 }
 
 # Global variables for statistics
@@ -298,12 +313,18 @@ parse_arguments() {
                 if [[ -z "$2" ]]; then
                     handle_error 100 "Option -l requires an argument"
                 fi
-                # Check admin privileges for log directory creation
-                if [[ "$2" != "$SCRIPT_DIR"* && $EUID -ne 0 ]]; then
-                    handle_error 105 "Option -l requires administrator privileges for system log directories"
-                fi
                 LOG_DIR="$2"
-                HISTORY_LOG="$LOG_DIR/history.log"
+                # Handle local directory case
+                if [[ "$2" == "." ]]; then
+                    LOG_DIR="$SCRIPT_DIR"
+                    HISTORY_LOG="$SCRIPT_DIR/history.log"
+                else
+                    # Check admin privileges for non-local log directory creation
+                    if [[ "$2" != "$SCRIPT_DIR"* && $EUID -ne 0 ]]; then
+                        handle_error 105 "Option -l requires administrator privileges for system log directories"
+                    fi
+                    HISTORY_LOG="$LOG_DIR/history.log"
+                fi
                 shift 2
                 ;;
             -r|--restore)
@@ -864,7 +885,15 @@ EOF
 main() {
     echo "CodeAudit v$VERSION started at $(date)" > "$LOG_FILE"
     
-    # Setup history logging
+    # Parse arguments FIRST
+    parse_arguments "$@"
+
+    if [[ "$HELP" == true ]]; then
+        show_help
+        exit 0 # Trap will handle cleanup
+    fi
+    
+    # Setup history logging AFTER parsing arguments
     setup_history_log
     
     # Handle default settings restoration if requested
@@ -894,13 +923,6 @@ main() {
     export -f analyze_file detect_language scan_security_vulnerabilities scan_quality_issues log_message handle_error
     export VERBOSE TMP_ISSUES_FILE LOG_FILE RED GREEN YELLOW BLUE NC SCRIPT_DIR TMP_COUNTS_FILE PARALLEL_MAX_PROCS ERROR_CODES
 
-    parse_arguments "$@"
-
-    if [[ "$HELP" == true ]]; then
-        show_help
-        exit 0 # Trap will handle cleanup
-    fi
-    
     validate_arguments
 
     log_message "INFO" "Starting CodeAudit analysis"
@@ -920,6 +942,11 @@ main() {
     generate_output 
 
     log_message "INFO" "Analysis completed. Files: $TOTAL_FILES_PROCESSED, Issues: $AGGREGATED_ISSUES_FOUND"
+    
+    # Write completion entry to history log
+    local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+    local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+    echo "$timestamp : $username : INFOS : Analysis completed. Files: $TOTAL_FILES_PROCESSED, Issues: $AGGREGATED_ISSUES_FOUND" >> "$HISTORY_LOG"
 
     if [[ -n "$OUTPUT_FILE" ]]; then
         echo -e "${GREEN}Analysis complete!${NC} Results written to both terminal and file: $OUTPUT_FILE" >&2

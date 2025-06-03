@@ -1,0 +1,130 @@
+# ========================================================
+# CodeAudit Demo Commands - Presentation Script
+# Focused on highlighted feature: ./codeaudit.sh -l .
+# ========================================================
+
+# ========================================================
+# SECTION 1: BASIC SETUP
+# ========================================================
+
+chmod +x codeaudit.sh
+./codeaudit.sh --help
+./codeaudit.sh -v
+
+# ========================================================
+# SECTION 2: OUTPUT FORMATS WITH SIMULTANEOUS DISPLAY
+# ========================================================
+
+./codeaudit.sh --format text -o 'demo_report.txt'
+./codeaudit.sh --format html -o 'professional_report.html'
+./codeaudit.sh --format json -o 'automation_data.json'
+ls -la demo_report.txt professional_report.html automation_data.json
+
+# ========================================================
+# SECTION 3: PARALLEL PROCESSING PERFORMANCE
+# ========================================================
+
+time ./codeaudit.sh -m sequential
+time ./codeaudit.sh -f
+time ./codeaudit.sh -t
+time ./codeaudit.sh -s
+
+# ========================================================
+# SECTION 4: HIGHLIGHTED FEATURE - LOCAL LOGGING
+# ========================================================
+
+⭐ HIGHLIGHTED COMMAND:
+./codeaudit.sh -l .
+
+ls -la *.log
+cat *.log
+
+./codeaudit.sh -l . -v --format json -o 'comprehensive_analysis.json'
+ls -la comprehensive_analysis.json *.log
+
+# ========================================================
+# SECTION 5: ERROR HANDLING DEMONSTRATION
+# ========================================================
+
+./codeaudit.sh -x
+./codeaudit.sh --format xml
+
+# ========================================================
+# SECTION 6: ADVANCED COMBINATIONS
+# ========================================================
+
+./codeaudit.sh -f -v --format html -o 'enterprise_report.html' -l .
+ls -la enterprise_report.html *.log
+
+./codeaudit.sh --format json -o 'ci_results.json' -f -l /var/log/codeaudit
+
+while true; do
+    ./codeaudit.sh --format json -o "monitor_$(date +%s).json" -l .
+    sleep 3600
+done
+
+# ========================================================
+# SECTION 7: CROSS-PLATFORM COMPATIBILITY
+# ========================================================
+
+# Linux/WSL:
+./codeaudit.sh -l . -v
+
+# PowerShell:
+bash codeaudit.sh -l . -v
+
+# Windows:
+wsl bash codeaudit.sh -l . -v
+
+# ========================================================
+# SECTION 8: PERFORMANCE BENCHMARKING
+# ========================================================
+
+echo 'Sequential Mode:'
+time ./codeaudit.sh -m sequential --format json -o 'seq_benchmark.json'
+
+echo 'Fork Mode:'
+time ./codeaudit.sh -f --format json -o 'fork_benchmark.json'
+
+echo 'Thread Mode:'
+time ./codeaudit.sh -t --format json -o 'thread_benchmark.json'
+
+# ========================================================
+# BACKUP COMMANDS (if live demo fails)
+# ========================================================
+
+echo 'console.log("test");' > test.js && ./codeaudit.sh
+./codeaudit.sh --help | head -20
+./codeaudit.sh -l . -v && ls -la *.log
+./codeaudit.sh -x
+time ./codeaudit.sh -m sequential
+time ./codeaudit.sh -f
+
+# ========================================================
+# KEY DEMONSTRATION SEQUENCE
+# ========================================================
+
+# 1. Show basic functionality
+./codeaudit.sh -v
+
+# 2. Demonstrate highlighted local logging feature
+./codeaudit.sh -l .
+
+# 3. Show the improved log format
+cat *.log
+
+# 4. Show simultaneous output
+./codeaudit.sh --format html -o 'demo.html'
+
+# 5. Show parallel processing performance
+time ./codeaudit.sh -f
+
+# 6. Show comprehensive combination
+./codeaudit.sh -f -v --format json -o 'complete.json' -l .
+
+# 7. Show all outputs created
+ls -la *.html *.json *.log *.txt
+
+# ========================================================
+# END OF DEMO COMMANDS
+# ========================================================
