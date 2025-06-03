@@ -1,27 +1,42 @@
-#!/bin/bash
-# CodeAudit - Simplified Code Quality and Security Analysis Tool
+﻿#!/bin/bash
+# CodeAudit - Code Quality and Security Analysis Tool
 # For Operating Systems Module Mini Project
 # Compatible with Windows PowerShell and Unix/Linux systems
 
-VERSION="1.0.0"
+VERSION="2.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$SCRIPT_DIR/codeaudit.log"
+HISTORY_LOG="/var/log/codeaudit/history.log"
 
 # Default configuration
 DEFAULT_TARGET="$SCRIPT_DIR/mini_project"
 DEFAULT_OUTPUT_FORMAT="text"
 DEFAULT_PROCESS_MODE="sequential"
 DEFAULT_OUTPUT_FILE=""
+DEFAULT_LOG_DIR="/var/log/codeaudit"
 
 # Initialize variables
 TARGET_DIR="$DEFAULT_TARGET"
 OUTPUT_FORMAT="$DEFAULT_OUTPUT_FORMAT"
 PROCESS_MODE="$DEFAULT_PROCESS_MODE"
 OUTPUT_FILE="$DEFAULT_OUTPUT_FILE"
+LOG_DIR="$DEFAULT_LOG_DIR"
 VERBOSE=false
 HELP=false
+RESTORE_DEFAULTS=false
 
-# Define temp file paths globally using PID for uniqueness
+# Define error codes with associative array
+declare -A ERROR_CODES
+ERROR_CODES[100]="Invalid option entered"
+ERROR_CODES[101]="Target directory not found"
+ERROR_CODES[102]="Invalid output format"
+ERROR_CODES[103]="Invalid process mode"
+ERROR_CODES[104]="Error creating output file"
+ERROR_CODES[105]="Administrator privileges required"
+ERROR_CODES[106]="Log initialization failed"
+ERROR_CODES[107]="Code analysis error"
+
+# Define temporary files globally using PID for uniqueness
 TMP_ISSUES_FILE="$SCRIPT_DIR/codeaudit_issues.$$.tmp"
 TMP_COUNTS_FILE="$SCRIPT_DIR/codeaudit_counts.$$.tmp"
 
@@ -29,7 +44,7 @@ TMP_COUNTS_FILE="$SCRIPT_DIR/codeaudit_counts.$$.tmp"
 _cleanup() {
     echo "DEBUG: Cleaning up temporary files..." >&2
     rm -f "$TMP_ISSUES_FILE" "$TMP_COUNTS_FILE"
-    echo "DEBUG: Cleanup finished." >&2
+    echo "DEBUG: Cleanup completed." >&2
 }
 
 # Trap to ensure cleanup runs on exit or interruption
@@ -50,6 +65,76 @@ else
     NC='\\033[0m'
 fi
 
+# Error handling function with error codes
+handle_error() {
+    local error_code="$1"
+    local context="$2"
+    local message="${ERROR_CODES[$error_code]}"
+    
+    if [[ -z "$message" ]]; then
+        message="Unknown error (code: $error_code)"
+    fi
+    
+    if [[ -n "$context" ]]; then
+        message="$message - $context"
+    fi
+    
+    echo -e "${RED}Error $error_code:${NC} $message" >&2
+    log_message "ERROR" "Code $error_code: $message"
+    
+    # Write to history log if available and writable
+    if [[ -n "$HISTORY_LOG" && -f "$HISTORY_LOG" && -w "$HISTORY_LOG" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR $error_code: $message" >> "$HISTORY_LOG"
+    fi
+    
+    exit "$error_code"
+}
+
+# Admin privileges check function
+check_admin_privileges() {
+    if [[ $EUID -ne 0 ]]; then
+        handle_error 105 "This operation requires administrator privileges (sudo)"
+    fi
+}
+
+# History log setup function
+setup_history_log() {
+    # Try to create log directory if it doesn't exist
+    if [[ ! -d "$LOG_DIR" ]]; then
+        if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
+            # If we can't create the system log directory, use local directory
+            echo -e "${YELLOW}Warning:${NC} Cannot create $LOG_DIR. Using local directory." >&2
+            LOG_DIR="$SCRIPT_DIR"
+            HISTORY_LOG="$SCRIPT_DIR/history.log"
+        fi
+    fi
+    
+    # If still using system path, update HISTORY_LOG
+    if [[ "$LOG_DIR" != "$SCRIPT_DIR" ]]; then
+        HISTORY_LOG="$LOG_DIR/history.log"
+    fi
+    
+    # Create history log file if it doesn't exist
+    if [[ ! -f "$HISTORY_LOG" ]]; then
+        if ! touch "$HISTORY_LOG" 2>/dev/null; then
+            # Final fallback to local directory
+            HISTORY_LOG="$SCRIPT_DIR/history.log"
+            touch "$HISTORY_LOG" || handle_error 106 "Cannot create local log file"
+        fi
+    fi
+    
+    # Ensure proper permissions if we have root access
+    if [[ $EUID -eq 0 && -f "$HISTORY_LOG" ]]; then
+        chmod 644 "$HISTORY_LOG" 2>/dev/null
+        chown root:root "$HISTORY_LOG" 2>/dev/null
+    fi
+    
+    # Write startup entry to history log
+    if [[ -w "$HISTORY_LOG" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting CodeAudit v$VERSION" >> "$HISTORY_LOG"
+    fi
+}
+
 # Global variables for statistics
 TOTAL_FILES_PROCESSED=0
 AGGREGATED_ISSUES_FOUND=0
@@ -68,6 +153,14 @@ log_message() {
     fi
 }
 
+# History logging function
+log_to_history() {
+    local message="$1"
+    if [[ -n "$HISTORY_LOG" && -f "$HISTORY_LOG" && -w "$HISTORY_LOG" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$HISTORY_LOG"
+    fi
+}
+
 # Help function
 show_help() {
     cat << EOF
@@ -77,27 +170,61 @@ USAGE:
     $0 [OPTIONS] [TARGET_DIRECTORY]
 
 OPTIONS:
-    -h, --help              Show this help message
+    -h, --help              Display this help message
     -v, --verbose           Enable verbose output
     -f, --format FORMAT     Output format (text, html, json) [default: text]
     -o, --output FILE       Output file (default: stdout)
     -m, --mode MODE         Process mode (sequential, fork, subshell, thread) [default: sequential]
-                            Additional flags: --fork, --thread, --subshell to set mode.
+    -d, --directory DIR     Target directory to analyze [default: $DEFAULT_TARGET]
+    --fork                  Use fork mode for parallel processing
+    --thread                Use thread mode for parallel processing
+    --subshell              Use subshell mode for parallel processing
+    -l, --log DIR           Log files directory [default: $DEFAULT_LOG_DIR]
+    -r, --restore           Restore default settings (requires sudo)
 
 EXAMPLES:
-    $0                                          # Analyze default mini_project directory
-    $0 -f html -o report.html                  # Generate HTML report
-    $0 -m fork -v /path/to/code                # Use fork mode with verbose output
-    $0 --subshell /path/to/code                # Use subshell mode
-    $0 --format json --output results.json    # Generate JSON report
+    $0                                    # Analyze default directory
+    $0 -v -f json -o report.json         # Detailed JSON output
+    $0 -d /path/to/code --fork            # Analyze specific directory in fork mode
+    $0 -m thread -v                       # Thread mode with verbose output
+    sudo $0 -r                            # Restore default settings
+
+OUTPUT FORMATS:
+    text    Simple text format (default)
+    html    HTML report with formatting
+    json    Structured JSON format
 
 PROCESS MODES:
-    sequential  - Analyze files one by one (default)
-    fork        - Use fork() for parallel processing (Unix only)
-    subshell    - Use subshells for parallel processing
-    thread      - Simulate threading with background processes
+    sequential  Sequential processing (default)
+    fork        Parallel processing with fork
+    thread      Parallel processing with threads
+    subshell    Parallel processing with subshells
 
+For more information, consult the project documentation.
 EOF
+}
+
+# Default settings restoration function
+restore_defaults() {
+    check_admin_privileges
+    
+    echo -e "${BLUE}Restoring default settings...${NC}"
+    
+    # Restore default values
+    TARGET_DIR="$DEFAULT_TARGET"
+    OUTPUT_FORMAT="$DEFAULT_OUTPUT_FORMAT"
+    PROCESS_MODE="$DEFAULT_PROCESS_MODE"
+    OUTPUT_FILE="$DEFAULT_OUTPUT_FILE"
+    LOG_DIR="$DEFAULT_LOG_DIR"
+    VERBOSE=false
+    
+    # Recreate log directories
+    setup_history_log
+    
+    echo -e "${GREEN}Default settings restored successfully.${NC}"
+    log_to_history "Default settings restored successfully"
+    
+    exit 0
 }
 
 # Parse command line arguments
@@ -113,16 +240,44 @@ parse_arguments() {
                 shift
                 ;;
             -f|--format)
+                if [[ -z "$2" ]]; then
+                    handle_error 100 "Option -f requires an argument"
+                fi
                 OUTPUT_FORMAT="$2"
                 shift 2
                 ;;
             -o|--output)
+                if [[ -z "$2" ]]; then
+                    handle_error 100 "Option -o requires an argument"
+                fi
                 OUTPUT_FILE="$2"
                 shift 2
                 ;;
             -m|--mode)
+                if [[ -z "$2" ]]; then
+                    handle_error 100 "Option -m requires an argument"
+                fi
                 PROCESS_MODE="$2"
                 shift 2
+                ;;
+            -d|--directory)
+                if [[ -z "$2" ]]; then
+                    handle_error 100 "Option -d requires an argument"
+                fi
+                TARGET_DIR="$2"
+                shift 2
+                ;;
+            -l|--log)
+                if [[ -z "$2" ]]; then
+                    handle_error 100 "Option -l requires an argument"
+                fi
+                LOG_DIR="$2"
+                HISTORY_LOG="$LOG_DIR/history.log"
+                shift 2
+                ;;
+            -r|--restore)
+                RESTORE_DEFAULTS=true
+                shift
                 ;;
             --fork)
                 PROCESS_MODE="fork"
@@ -137,9 +292,7 @@ parse_arguments() {
                 shift
                 ;;
             -*)
-                echo "Unknown option: $1"
-                show_help
-                exit 1
+                handle_error 100 "Unknown option: $1"
                 ;;
             *)
                 TARGET_DIR="$1"
@@ -154,25 +307,31 @@ validate_arguments() {
     # Check output format
     case "$OUTPUT_FORMAT" in
         text|html|json) ;;
-        *) echo "Error: Invalid output format '$OUTPUT_FORMAT'. Use: text, html, json"; exit 1 ;;
+        *) handle_error 102 "Invalid output format '$OUTPUT_FORMAT'. Use: text, html, json" ;;
     esac
     
     # Check process mode
     case "$PROCESS_MODE" in
         sequential|fork|subshell|thread) ;;
-        *) echo "Error: Invalid process mode '$PROCESS_MODE'. Use: sequential, fork, subshell, thread"; exit 1 ;;
+        *) handle_error 103 "Invalid process mode '$PROCESS_MODE'. Use: sequential, fork, subshell, thread" ;;
     esac
     
     # Check target directory
     if [[ ! -d "$TARGET_DIR" ]]; then
-        echo "Error: Target directory '$TARGET_DIR' does not exist"
-        exit 1
+        handle_error 101 "Target directory '$TARGET_DIR' does not exist"
     fi
     
     # Check fork availability on Windows
     if [[ "$PROCESS_MODE" == "fork" && ("$OSTYPE" == "msys" || "$OSTYPE" == "win32") ]]; then
-        echo "Warning: Fork mode not available on Windows. Using subshell mode instead."
+        echo -e "${YELLOW}Warning:${NC} Fork mode not available on Windows. Using subshell mode instead." >&2
         PROCESS_MODE="subshell"
+    fi
+    
+    # Create output file if specified
+    if [[ -n "$OUTPUT_FILE" ]]; then
+        if ! touch "$OUTPUT_FILE" 2>/dev/null; then
+            handle_error 104 "Cannot create output file '$OUTPUT_FILE'"
+        fi
     fi
 }
 
@@ -195,7 +354,7 @@ detect_language() {
     esac
 }
 
-# Security vulnerability scanning
+# Security vulnerability analysis
 scan_security_vulnerabilities() {
     local file="$1"
     local language="$2"
@@ -208,7 +367,7 @@ scan_security_vulnerabilities() {
                 issues+=("SECURITY: Dangerous eval() function usage")
             fi
             
-            # Check for hardcoded passwords/secrets
+            # Check for hardcoded passwords
             if grep -iq "password\s*=\s*['\"][^'\"]*['\"]" "$file" 2>/dev/null; then
                 issues+=("SECURITY: Hardcoded password detected")
             fi
@@ -259,7 +418,7 @@ scan_security_vulnerabilities() {
     printf '%s\n' "${issues[@]}"
 }
 
-# Code quality issues scanning
+# Code quality issue analysis
 scan_quality_issues() {
     local file="$1"
     local language="$2"
@@ -304,7 +463,7 @@ scan_quality_issues() {
     printf '%s\n' "${issues[@]}"
 }
 
-# Analyze single file
+# Analyze a single file
 analyze_file() {
     local file="$1"
     local language
@@ -322,7 +481,7 @@ analyze_file() {
     local current_file_security_issues=0
     local current_file_quality_issues=0
 
-    # Scan for security vulnerabilities
+    # Analyze security vulnerabilities
     local security_scan_output
     security_scan_output=$(scan_security_vulnerabilities "$file" "$language")
     while IFS= read -r issue; do
@@ -332,7 +491,7 @@ analyze_file() {
         fi
     done <<< "$security_scan_output"
 
-    # Scan for quality issues
+    # Analyze quality issues
     local quality_scan_output
     quality_scan_output=$(scan_quality_issues "$file" "$language")
     while IFS= read -r issue; do
@@ -342,12 +501,12 @@ analyze_file() {
         fi
     done <<< "$quality_scan_output"
 
-    # If issues found for this file, append them to TMP_ISSUES_FILE for detailed reporting
+    # If issues found for this file, add them to TMP_ISSUES_FILE for detailed report
     if [[ ${#file_issues_details[@]} -gt 0 ]]; then
         echo "$file@@@$(IFS=###; echo "${file_issues_details[*]}")" >> "$TMP_ISSUES_FILE"
     fi
 
-    # Echo counts: 1 (indicates this file was processed), security issues, quality issues
+    # Echo counters: 1 (indicates this file was processed), security issues, quality issues
     echo "1:$current_file_security_issues:$current_file_quality_issues"
 }
 
@@ -359,12 +518,12 @@ process_files() {
         files+=("$file")
     done < <(find "$TARGET_DIR" -type f -print0 2>/dev/null)
 
-    log_message "INFO" "Found ${#files[@]} files to analyze using $PROCESS_MODE mode with $PARALLEL_MAX_PROCS max processes."
+    log_message "INFO" "Found ${#files[@]} files to analyze in $PROCESS_MODE mode with $PARALLEL_MAX_PROCS maximum processes."
 
     # Ensure TMP_COUNTS_FILE is clean for parallel modes
     if [[ "$PROCESS_MODE" != "sequential" ]]; then
         >"$TMP_COUNTS_FILE" # Ensure it's clean
-        echo "DEBUG: Cleared TMP_COUNTS_FILE ($TMP_COUNTS_FILE) for parallel mode." >&2
+        echo "DEBUG: TMP_COUNTS_FILE cleared ($TMP_COUNTS_FILE) for parallel mode." >&2
     fi
 
     case "$PROCESS_MODE" in
@@ -382,28 +541,27 @@ process_files() {
                 fi
             done
             ;;
-
         "fork"|"subshell"|"thread")
             local job_pids=()
             local current_jobs=0
             for file in "${files[@]}"; do
                 (analyze_file "$file" >> "$TMP_COUNTS_FILE") &
-                job_pids+=($!) # Store PID of the background job
+                job_pids+=($!) # Store background job PID
                 ((current_jobs++))
                 
-                echo "DEBUG: Launched job for $file. Current jobs: $current_jobs" >&2
+                echo "DEBUG: Job started for $file. Current jobs: $current_jobs" >&2
 
                 if (( current_jobs >= PARALLEL_MAX_PROCS )); then
-                    echo "DEBUG: Max processes ($PARALLEL_MAX_PROCS) reached. Waiting for a job to finish..." >&2
-                    wait -n # Wait for any one background job to complete
+                    echo "DEBUG: Maximum processes ($PARALLEL_MAX_PROCS) reached. Waiting for a job to finish..." >&2
+                    wait -n # Wait for a background job to finish
                     ((current_jobs--))
-                    echo "DEBUG: A job finished. Current jobs: $current_jobs" >&2
+                    echo "DEBUG: One job finished. Current jobs: $current_jobs" >&2
                 fi
             done
             
-            echo "DEBUG: All files dispatched. Waiting for remaining ${#job_pids[@]} jobs to complete..." >&2
+            echo "DEBUG: All files submitted. Waiting for ${#job_pids[@]} remaining jobs..." >&2
             wait # Wait for all remaining background jobs associated with this shell
-            echo "DEBUG: All background jobs completed." >&2
+            echo "DEBUG: All background jobs finished." >&2
 
             # Aggregate results from TMP_COUNTS_FILE
             if [[ -f "$TMP_COUNTS_FILE" ]]; then
@@ -421,18 +579,18 @@ process_files() {
                         AGGREGATED_QUALITY_ISSUES=$((AGGREGATED_QUALITY_ISSUES + file_qual_issues))
                         echo "DEBUG: Counters updated: TFP=$TOTAL_FILES_PROCESSED, ASI=$AGGREGATED_SECURITY_ISSUES, AQI=$AGGREGATED_QUALITY_ISSUES" >&2
                     else
-                        echo "DEBUG: Skipped line $line_num due to invalid data: P='$processed_flag', S='$file_sec_issues', Q='$file_qual_issues'" >&2
+                        echo "DEBUG: Line $line_num ignored due to invalid data: P='$processed_flag', S='$file_sec_issues', Q='$file_qual_issues'" >&2
                     fi
                 done < "$TMP_COUNTS_FILE"
-                echo "DEBUG: Finished reading TMP_COUNTS_FILE. Final counters in process_files: TFP=$TOTAL_FILES_PROCESSED, ASI=$AGGREGATED_SECURITY_ISSUES, AQI=$AGGREGATED_QUALITY_ISSUES" >&2
+                echo "DEBUG: TMP_COUNTS_FILE reading completed. Final counters in process_files: TFP=$TOTAL_FILES_PROCESSED, ASI=$AGGREGATED_SECURITY_ISSUES, AQI=$AGGREGATED_QUALITY_ISSUES" >&2
             else
-                echo "DEBUG: TMP_COUNTS_FILE ($TMP_COUNTS_FILE) not found or was empty after jobs." >&2
+                echo "DEBUG: TMP_COUNTS_FILE ($TMP_COUNTS_FILE) not found or empty after jobs." >&2
             fi
             ;;
     esac
 
     AGGREGATED_ISSUES_FOUND=$((AGGREGATED_SECURITY_ISSUES + AGGREGATED_QUALITY_ISSUES))
-    echo "DEBUG: process_files finished. AGGREGATED_ISSUES_FOUND=$AGGREGATED_ISSUES_FOUND" >&2
+    echo "DEBUG: process_files completed. AGGREGATED_ISSUES_FOUND=$AGGREGATED_ISSUES_FOUND" >&2
 }
 
 # Generate output based on format
@@ -444,8 +602,8 @@ generate_output() {
             echo "========================="
             echo "Target Directory: $TARGET_DIR"
             echo "Process Mode: $PROCESS_MODE"
-            echo "Total Files Analyzed: $TOTAL_FILES_PROCESSED"
-            echo "Total Issues Found: $AGGREGATED_ISSUES_FOUND"
+            echo "Files Analyzed: $TOTAL_FILES_PROCESSED"
+            echo "Issues Found: $AGGREGATED_ISSUES_FOUND"
             echo "Security Issues: $AGGREGATED_SECURITY_ISSUES"
             echo "Quality Issues: $AGGREGATED_QUALITY_ISSUES"
             echo
@@ -470,21 +628,20 @@ generate_output() {
                 echo "No issues found."
             fi
             ;;
-
         "json")
-            printf "{\\n"
-            printf "    \"codeaudit_report\": {\\n"
-            printf "        \"version\": \"%s\",\\n" "$VERSION"
-            printf "        \"timestamp\": \"%s\",\\n" "$(date -Iseconds)"
-            printf "        \"target_directory\": \"%s\",\\n" "$TARGET_DIR"
-            printf "        \"process_mode\": \"%s\",\\n" "$PROCESS_MODE"
-            printf "        \"summary\": {\\n"
-            printf "            \"total_files_analyzed\": %d,\\n" "$TOTAL_FILES_PROCESSED"
-            printf "            \"total_issues_found\": %d,\\n" "$AGGREGATED_ISSUES_FOUND"
-            printf "            \"security_issues\": %d,\\n" "$AGGREGATED_SECURITY_ISSUES"
-            printf "            \"quality_issues\": %d\\n" "$AGGREGATED_QUALITY_ISSUES"
-            printf "        },\\n"
-            printf "        \"issues_by_file\": [\\n"
+            printf "{\n"
+            printf "    \"codeaudit_report\": {\n"
+            printf "        \"version\": \"%s\",\n" "$VERSION"
+            printf "        \"timestamp\": \"%s\",\n" "$(date -Iseconds)"
+            printf "        \"target_directory\": \"%s\",\n" "$TARGET_DIR"
+            printf "        \"process_mode\": \"%s\",\n" "$PROCESS_MODE"
+            printf "        \"summary\": {\n"
+            printf "            \"files_analyzed\": %d,\n" "$TOTAL_FILES_PROCESSED"
+            printf "            \"issues_found\": %d,\n" "$AGGREGATED_ISSUES_FOUND"
+            printf "            \"security_issues\": %d,\n" "$AGGREGATED_SECURITY_ISSUES"
+            printf "            \"quality_issues\": %d\n" "$AGGREGATED_QUALITY_ISSUES"
+            printf "        },\n"
+            printf "        \"file_details\": [\n"
 
             local first_file_entry=true
             if [[ -f "$TMP_ISSUES_FILE" ]] && [[ -s "$TMP_ISSUES_FILE" ]]; then
@@ -494,38 +651,37 @@ generate_output() {
                     local issues_str="${line#*@@@}"
 
                     if ! $first_file_entry; then
-                        printf ",\\n"
+                        printf ",\n"
                     fi
                     first_file_entry=false
 
                     local escaped_file_path=$(echo "$file_path" | sed 's/\\/\\\\/g; s/"/\\"/g') 
-                    printf "            {\\n"
-                    printf "                \"file\": \"%s\",\\n" "$escaped_file_path"
-                    printf "                \"issues\": [\\n"
+                    printf "            {\n"
+                    printf "                \"file\": \"%s\",\n" "$escaped_file_path"
+                    printf "                \"issues\": [\n"
 
                     local first_issue=true
                     IFS='###' read -r -a issues_array <<< "$issues_str"
                     for issue in "${issues_array[@]}"; do
                         if ! $first_issue; then
-                            printf ",\\n"
+                            printf ",\n"
                         fi
                         first_issue=false
                         local escaped_issue=$(echo "$issue" | sed 's/\\/\\\\/g; s/"/\\"/g') 
                         printf "                    \"%s\"" "$escaped_issue"
                     done
-                    printf "\\n                ]\\n"
+                    printf "\n                ]\n"
                     printf "            }"
                 done < "$TMP_ISSUES_FILE"
             fi
-            printf "\\n        ]\\n" 
-            printf "    }\\n"       
-            printf "}\\n"          
+            printf "\n        ]\n" 
+            printf "    }\n"       
+            printf "}\n"          
             ;;
-
         "html")
             cat << EOF
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>CodeAudit Report</title>
     <style>
@@ -552,15 +708,15 @@ generate_output() {
         <div class="header">
             <h1>CodeAudit Analysis Report</h1>
             <p><strong>Target:</strong> $TARGET_DIR</p>
-            <p><strong>Generated:</strong> $(date)</p>
+            <p><strong>Generated on:</strong> $(date)</p>
             <p><strong>Process Mode:</strong> $PROCESS_MODE</p>
         </div>
     
         <div class="summary">
             <h2>Summary</h2>
             <ul>
-                <li>Total Files Analyzed: $TOTAL_FILES_PROCESSED</li>
-                <li>Total Issues Found: $AGGREGATED_ISSUES_FOUND</li>
+                <li>Files Analyzed: $TOTAL_FILES_PROCESSED</li>
+                <li>Issues Found: $AGGREGATED_ISSUES_FOUND</li>
                 <li>Security Issues: <span class="security">$AGGREGATED_SECURITY_ISSUES</span></li>
                 <li>Quality Issues: <span class="quality">$AGGREGATED_QUALITY_ISSUES</span></li>
             </ul>
@@ -611,11 +767,20 @@ EOF
 # Main execution function
 main() {
     echo "CodeAudit v$VERSION started at $(date)" > "$LOG_FILE"
+    
+    # Setup history logging
+    setup_history_log
+    
+    # Handle default settings restoration if requested
+    if [[ "$RESTORE_DEFAULTS" == true ]]; then
+        restore_defaults
+        exit 0
+    fi
+    
     # Truncate temp files at the start of the main script
     >"$TMP_ISSUES_FILE"
     >"$TMP_COUNTS_FILE"
-    echo "DEBUG: Initialized/Cleared TMP_ISSUES_FILE ($TMP_ISSUES_FILE) and TMP_COUNTS_FILE ($TMP_COUNTS_FILE)." >&2
-
+    echo "DEBUG: Temporary files initialized/cleared TMP_ISSUES_FILE ($TMP_ISSUES_FILE) and TMP_COUNTS_FILE ($TMP_COUNTS_FILE)." >&2
 
     TOTAL_FILES_PROCESSED=0
     AGGREGATED_ISSUES_FOUND=0
@@ -630,8 +795,8 @@ main() {
     fi
     echo "DEBUG: PARALLEL_MAX_PROCS set to $PARALLEL_MAX_PROCS." >&2
 
-    export -f analyze_file detect_language scan_security_vulnerabilities scan_quality_issues log_message
-    export VERBOSE TMP_ISSUES_FILE LOG_FILE RED GREEN YELLOW BLUE NC SCRIPT_DIR TMP_COUNTS_FILE PARALLEL_MAX_PROCS
+    export -f analyze_file detect_language scan_security_vulnerabilities scan_quality_issues log_message handle_error
+    export VERBOSE TMP_ISSUES_FILE LOG_FILE RED GREEN YELLOW BLUE NC SCRIPT_DIR TMP_COUNTS_FILE PARALLEL_MAX_PROCS ERROR_CODES
 
     parse_arguments "$@"
 
@@ -644,6 +809,7 @@ main() {
 
     log_message "INFO" "Starting CodeAudit analysis"
     log_message "INFO" "Target: $TARGET_DIR, Format: $OUTPUT_FORMAT, Mode: $PROCESS_MODE"
+    log_to_history "Analysis started - Target: $TARGET_DIR, Format: $OUTPUT_FORMAT, Mode: $PROCESS_MODE"
 
     if [[ -n "$OUTPUT_FILE" ]]; then
         exec > "$OUTPUT_FILE"
@@ -653,7 +819,8 @@ main() {
 
     generate_output 
 
-    log_message "INFO" "Analysis completed. Files: $TOTAL_FILES_PROCESSED, Issues: $AGGREGREGATED_ISSUES_FOUND"
+    log_message "INFO" "Analysis completed. Files: $TOTAL_FILES_PROCESSED, Issues: $AGGREGATED_ISSUES_FOUND"
+    log_to_history "Analysis completed - Files: $TOTAL_FILES_PROCESSED, Security Issues: $AGGREGATED_SECURITY_ISSUES, Quality Issues: $AGGREGATED_QUALITY_ISSUES"
 
     if [[ -n "$OUTPUT_FILE" ]]; then
         echo -e "${GREEN}Analysis complete!${NC} Results written to: $OUTPUT_FILE" >&2
@@ -662,175 +829,4 @@ main() {
     # No explicit rm here, trap will handle it.
 }
 
-# Make sure all necessary functions are defined before main is called
-# (detect_language, scan_security_vulnerabilities, scan_quality_issues are assumed to be defined from the original script)
-# For example:
-# detect_language() { ... }
-# scan_security_vulnerabilities() { ... }
-# scan_quality_issues() { ... }
-# validate_arguments() { ... }
-
 main "$@"
-
-# Ensure all functions from the original script are included below if they were not touched above
-# For example, the full definitions for:
-# validate_arguments() { ... }
-# detect_language() { ... }
-# scan_security_vulnerabilities() { ... }
-# scan_quality_issues() { ... }
-# are needed if they were not part of the "existing code" sections.
-# The provided attachment was partial, so I'm assuming these functions are present in your full script.
-# The edit focuses on the areas related to parallel processing and debugging.
-# The full functions for validate_arguments, detect_language, scan_security_vulnerabilities, scan_quality_issues
-# from your attachment are:
-
-validate_arguments() {
-    # Check output format
-    case "$OUTPUT_FORMAT" in
-        text|html|json) ;;
-        *) echo "Error: Invalid output format '$OUTPUT_FORMAT'. Use: text, html, json"; exit 1 ;;
-    esac
-    
-    # Check process mode
-    case "$PROCESS_MODE" in
-        sequential|fork|subshell|thread) ;;
-        *) echo "Error: Invalid process mode '$PROCESS_MODE'. Use: sequential, fork, subshell, thread"; exit 1 ;;
-    esac
-    
-    # Check target directory
-    if [[ ! -d "$TARGET_DIR" ]]; then
-        echo "Error: Target directory '$TARGET_DIR' does not exist"
-        exit 1
-    fi
-    
-    # Check fork availability on Windows
-    if [[ "$PROCESS_MODE" == "fork" && ("$OSTYPE" == "msys" || "$OSTYPE" == "win32") ]]; then
-        echo "Warning: Fork mode not available on Windows. Using subshell mode instead."
-        PROCESS_MODE="subshell"
-    fi
-}
-
-detect_language() {
-    local file="$1"
-    local extension="${file##*.}"
-    
-    case "$extension" in
-        js) echo "javascript" ;;
-        py) echo "python" ;;
-        c|h) echo "c" ;;
-        cpp|cc|cxx) echo "cpp" ;;
-        java) echo "java" ;;
-        php) echo "php" ;;
-        sh|bash) echo "shell" ;;
-        html|htm) echo "html" ;;
-        css) echo "css" ;;
-        *) echo "unknown" ;;
-    esac
-}
-
-scan_security_vulnerabilities() {
-    local file="$1"
-    local language="$2"
-    local issues=()
-    
-    case "$language" in
-        "javascript")
-            # Check for eval usage
-            if grep -q "eval(" "$file" 2>/dev/null; then
-                issues+=("SECURITY: Dangerous eval() function usage")
-            fi
-            
-            # Check for hardcoded passwords/secrets
-            if grep -iq "password\s*=\s*['\"][^'\"]*['\"]" "$file" 2>/dev/null; then
-                issues+=("SECURITY: Hardcoded password detected")
-            fi
-            
-            # Check for loose equality
-            if grep -q "==" "$file" 2>/dev/null; then
-                issues+=("SECURITY: Loose equality operator (use === instead)")
-            fi
-            ;;
-            
-        "python")
-            # Check for eval/exec usage
-            if grep -q "eval\|exec\|os\.system" "$file" 2>/dev/null; then
-                issues+=("SECURITY: Dangerous function usage (eval/exec/os.system)")
-            fi
-            
-            # Check for hardcoded secrets
-            if grep -iq "password\|secret\|api_key" "$file" 2>/dev/null; then
-                issues+=("SECURITY: Potential hardcoded credentials")
-            fi
-            ;;
-            
-        "c"|"cpp")
-            # Check for buffer overflow risks
-            if grep -q "gets\|strcpy\|strcat" "$file" 2>/dev/null; then
-                issues+=("SECURITY: Unsafe string functions (buffer overflow risk)")
-            fi
-            
-            # Check for memory leaks
-            if grep -q "malloc\|calloc" "$file" 2>/dev/null && ! grep -q "free" "$file" 2>/dev/null; then
-                issues+=("SECURITY: Potential memory leak (malloc without free)")
-            fi
-            ;;
-            
-        "php")
-            # Check for SQL injection
-            if grep -q "SELECT.*FROM.*WHERE" "$file" 2>/dev/null; then
-                issues+=("SECURITY: Potential SQL injection vulnerability")
-            fi
-            
-            # Check for file inclusion vulnerabilities
-            if grep -q "include\|require" "$file" 2>/dev/null; then
-                issues+=("SECURITY: File inclusion detected (check for LFI/RFI)")
-            fi
-            ;;
-    esac
-    
-    printf '%s\n' "${issues[@]}"
-}
-
-scan_quality_issues() {
-    local file="$1"
-    local language="$2"
-    local issues=()
-    
-    # Check file size
-    local file_size=$(wc -l < "$file" 2>/dev/null || echo "0")
-    if [[ $file_size -gt 500 ]]; then
-        issues+=("QUALITY: Large file ($file_size lines) - consider splitting")
-    fi
-    
-    # Check line length
-    if awk 'length > 120 { exit 1 }' "$file" 2>/dev/null; then
-        :
-    else
-        issues+=("QUALITY: Lines exceeding 120 characters detected")
-    fi
-    
-    case "$language" in
-        "javascript")
-            # Check for console.log
-            if grep -q "console\.log" "$file" 2>/dev/null; then
-                issues+=("QUALITY: Debug console.log statements found")
-            fi
-            ;;
-            
-        "python")
-            # Check for TODO comments
-            if grep -iq "todo\|fixme" "$file" 2>/dev/null; then
-                issues+=("QUALITY: TODO/FIXME comments found")
-            fi
-            ;;
-            
-        "c"|"cpp")
-            # Check for proper headers
-            if ! grep -q "#include" "$file" 2>/dev/null; then
-                issues+=("QUALITY: No include statements found")
-            fi
-            ;;
-    esac
-    
-    printf '%s\n' "${issues[@]}"
-}

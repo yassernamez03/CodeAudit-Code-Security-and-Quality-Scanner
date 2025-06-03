@@ -1,50 +1,295 @@
-# CodeAudit Bash Script Command Examples
+# CodeAudit Bash Script - Complete Command Reference
 
-# Basic sequential analysis of the default 'mini_project' directory
+# =====================================
+# BASIC USAGE COMMANDS
+# =====================================
+
+# Basic analysis with default settings (text format, sequential mode)
 ./codeaudit.sh
 
-# Analyze a specific target directory with verbose logging
-./codeaudit.sh -v # Assumes default target 'mini_project'
+# Basic analysis with verbose output
+./codeaudit.sh -v
+./codeaudit.sh --verbose
 
-# --- Output Formats ---
+# Display help information
+./codeaudit.sh -h
+./codeaudit.sh --help
 
-# Generate an HTML report
+# =====================================
+# DIRECTORY SPECIFICATION
+# =====================================
+
+# Analyze specific directory using -d option
+./codeaudit.sh -d /path/to/your/code
+./codeaudit.sh --directory /path/to/your/code
+
+# Analyze directory passed as positional argument
+./codeaudit.sh /path/to/your/code
+
+# Analyze current directory
+./codeaudit.sh -d .
+./codeaudit.sh .
+
+# =====================================
+# OUTPUT FORMAT OPTIONS
+# =====================================
+
+# Text format (default)
+./codeaudit.sh -f text
+./codeaudit.sh --format text
+
+# HTML format
+./codeaudit.sh -f html
+./codeaudit.sh --format html
+
+# JSON format
+./codeaudit.sh -f json
+./codeaudit.sh --format json
+
+# =====================================
+# OUTPUT FILE SPECIFICATION
+# =====================================
+
+# Save to file with -o option
+./codeaudit.sh -o report.txt
+./codeaudit.sh --output report.txt
+
+# Generate HTML report
 ./codeaudit.sh -f html -o "audit_report.html"
 
-# Generate a JSON report
-./codeaudit.sh --format json --output "audit_results.json"
+# Generate JSON report
+./codeaudit.sh -f json -o "audit_results.json"
 
-# --- Processing Modes ---
+# Generate timestamped reports
+./codeaudit.sh -f html -o "report_$(date +%Y%m%d_%H%M%S).html"
+./codeaudit.sh -f json -o "analysis_$(date +%Y-%m-%d).json"
+
+# =====================================
+# PROCESSING MODES
+# =====================================
 
 # Sequential processing (default)
 ./codeaudit.sh -m sequential
+./codeaudit.sh --mode sequential
 
-# Fork processing: Uses fork() for parallelism.
-# Good for maximizing parallelism if system resources allow (Unix-like systems).
-./codeaudit.sh --mode fork -v
+# Fork processing (parallel with fork)
+./codeaudit.sh -m fork
+./codeaudit.sh --mode fork
+./codeaudit.sh --fork
 
-# Subshell processing: Uses subshells with concurrency limiting.
-# Balances parallelism with system stability.
-./codeaudit.sh -m subshell -v -o subshell_report.txt # Assumes default target 'mini_project'
+# Thread processing (parallel with background jobs)
+./codeaudit.sh -m thread
+./codeaudit.sh --mode thread
+./codeaudit.sh --thread
 
-# Thread processing (Simulated with background jobs): Processes files in batches.
-# Good for large numbers of files to avoid overwhelming the system.
-./codeaudit.sh --mode thread --verbose
+# Subshell processing (parallel with subshells)
+./codeaudit.sh -m subshell
+./codeaudit.sh --mode subshell
+./codeaudit.sh --subshell
 
-# --- Help ---
+# =====================================
+# LOGGING OPTIONS
+# =====================================
 
-# Display the help message
-./codeaudit.sh -h
-# or
-./codeaudit.sh --help
+# Specify custom log directory
+./codeaudit.sh -l /custom/log/path
+./codeaudit.sh --log /custom/log/path
 
-# --- Combinations ---
+# Use local log directory
+./codeaudit.sh -l .
 
-# Analyze 'mini_project' (default), use fork mode, output to HTML, with verbose logging
-./codeaudit.sh -m fork -f html -o "fork_report.html" -v
+# =====================================
+# ADMINISTRATIVE COMMANDS
+# =====================================
 
-# Analyze 'mini_project' (default), use subshell mode, output to JSON
-./codeaudit.sh --mode subshell --format json --output "subshell_results.json"
+# Restore default settings (requires sudo)
+sudo ./codeaudit.sh -r
+sudo ./codeaudit.sh --restore
 
-# Analyze a different directory, use thread mode, verbose, output to text file
-./codeaudit.sh /path/to/your/code -m thread -v -f text -o "thread_analysis.txt"
+# =====================================
+# COMBINATION COMMANDS
+# =====================================
+
+# Verbose analysis with HTML output
+./codeaudit.sh -v -f html -o "detailed_report.html"
+
+# Fork mode with JSON output and verbose logging
+./codeaudit.sh --fork -f json -o "parallel_analysis.json" -v
+
+# Thread mode with custom directory and HTML output
+./codeaudit.sh -m thread -d /path/to/code -f html -o "thread_report.html"
+
+# Comprehensive analysis with all options
+./codeaudit.sh -d /path/to/code -f json -o "complete_audit.json" -m fork -v -l /tmp/logs
+
+# Multiple directories analysis (one at a time)
+./codeaudit.sh -d /project1 -f json -o "project1_analysis.json"
+./codeaudit.sh -d /project2 -f json -o "project2_analysis.json"
+
+# Quick security scan
+./codeaudit.sh -d /path/to/code -f text | grep "SECURITY"
+
+# Quality issues only
+./codeaudit.sh -d /path/to/code -f text | grep "QUALITY"
+
+# =====================================
+# ERROR SCENARIOS AND TROUBLESHOOTING
+# =====================================
+
+# These commands will produce specific error codes:
+
+# Error 100: Invalid option
+./codeaudit.sh -x                           # Unknown option
+./codeaudit.sh --invalid                    # Invalid long option
+./codeaudit.sh -f                          # Missing argument for -f
+./codeaudit.sh -o                          # Missing argument for -o
+./codeaudit.sh -m                          # Missing argument for -m
+./codeaudit.sh -d                          # Missing argument for -d
+./codeaudit.sh -l                          # Missing argument for -l
+
+# Error 101: Target directory not found
+./codeaudit.sh -d /nonexistent/directory
+./codeaudit.sh /does/not/exist
+./codeaudit.sh -d ""                       # Empty directory path
+
+# Error 102: Invalid output format
+./codeaudit.sh -f xml                      # Unsupported format
+./codeaudit.sh -f pdf                      # Invalid format
+./codeaudit.sh --format yaml               # Wrong format
+
+# Error 103: Invalid process mode
+./codeaudit.sh -m parallel                 # Wrong mode name
+./codeaudit.sh --mode async                # Invalid mode
+./codeaudit.sh -m invalid                  # Unsupported mode
+
+# Error 104: Error creating output file
+./codeaudit.sh -o /root/report.txt         # Permission denied (as non-root)
+./codeaudit.sh -o /nonexistent/path/file.txt # Directory doesn't exist
+
+# Error 105: Administrator privileges required
+./codeaudit.sh -r                          # Restore without sudo
+./codeaudit.sh --restore                   # Missing privileges
+
+# Error 106: Log initialization failed
+./codeaudit.sh -l /root/logs               # Permission denied for log dir
+
+# Error 107: Code analysis error (simulated)
+# This would occur during file processing errors
+
+# =====================================
+# TESTING AND VALIDATION COMMANDS
+# =====================================
+
+# Test all output formats
+./codeaudit.sh -f text -o "test_text.txt"
+./codeaudit.sh -f html -o "test_html.html"
+./codeaudit.sh -f json -o "test_json.json"
+
+# Test all processing modes
+./codeaudit.sh -m sequential -o "seq_test.txt"
+./codeaudit.sh -m fork -o "fork_test.txt"
+./codeaudit.sh -m thread -o "thread_test.txt"
+./codeaudit.sh -m subshell -o "subshell_test.txt"
+
+# Performance comparison
+time ./codeaudit.sh -m sequential -f json -o "seq_benchmark.json"
+time ./codeaudit.sh -m fork -f json -o "fork_benchmark.json"
+time ./codeaudit.sh -m thread -f json -o "thread_benchmark.json"
+
+# Memory usage monitoring
+/usr/bin/time -v ./codeaudit.sh -m fork -v
+
+# =====================================
+# ADVANCED USAGE PATTERNS
+# =====================================
+
+# Continuous monitoring (run periodically)
+while true; do
+    ./codeaudit.sh -f json -o "monitor_$(date +%s).json"
+    sleep 3600  # Wait 1 hour
+done
+
+# Batch processing multiple directories
+for dir in /project1 /project2 /project3; do
+    ./codeaudit.sh -d "$dir" -f json -o "$(basename $dir)_audit.json"
+done
+
+# Conditional analysis based on file count
+file_count=$(find /path/to/code -type f | wc -l)
+if [ $file_count -gt 100 ]; then
+    ./codeaudit.sh -d /path/to/code -m fork -v
+else
+    ./codeaudit.sh -d /path/to/code -m sequential -v
+fi
+
+# Filter results for specific languages
+./codeaudit.sh -f json | jq '.codeaudit_report.file_details[] | select(.file | endswith(".js"))'
+
+# Count issues by type
+./codeaudit.sh -f text | grep "SECURITY:" | wc -l
+./codeaudit.sh -f text | grep "QUALITY:" | wc -l
+
+# =====================================
+# DEBUGGING AND DIAGNOSTIC COMMANDS
+# =====================================
+
+# Debug mode (shows detailed execution info)
+bash -x ./codeaudit.sh -v
+
+# Check script permissions
+ls -la ./codeaudit.sh
+
+# Verify dependencies
+which bash
+echo $BASH_VERSION
+
+# Test with minimal example
+mkdir test_dir && echo "console.log('test');" > test_dir/test.js
+./codeaudit.sh -d test_dir -v
+rm -rf test_dir
+
+# =====================================
+# INTEGRATION EXAMPLES
+# =====================================
+
+# CI/CD pipeline integration
+./codeaudit.sh -f json -o "ci_report.json" && \
+if [ $(jq '.codeaudit_report.summary.issues_found' ci_report.json) -gt 0 ]; then
+    echo "Issues found - failing build"
+    exit 1
+fi
+
+# Git hook integration
+git diff --name-only HEAD~1 HEAD | xargs dirname | sort -u | while read dir; do
+    ./codeaudit.sh -d "$dir" -f text
+done
+
+# Generate reports for documentation
+./codeaudit.sh -f html -o "docs/security_audit.html"
+./codeaudit.sh -f json -o "reports/$(date +%Y-%m-%d)_audit.json"
+
+# =====================================
+# WINDOWS/WSL SPECIFIC COMMANDS
+# =====================================
+
+# Run through WSL on Windows
+wsl bash ./codeaudit.sh -v
+
+# Windows paths (converted to WSL paths)
+wsl bash ./codeaudit.sh -d "/mnt/c/Users/admin/Documents/code"
+
+# Handle Windows line endings
+dos2unix ./codeaudit.sh  # Convert if needed
+wsl bash ./codeaudit.sh
+
+# =====================================
+# NOTES AND BEST PRACTICES
+# =====================================
+
+# Note: Some commands above may produce errors intentionally for testing
+# Always ensure you have appropriate permissions before running
+# Use 'sudo' commands carefully and only when necessary
+# For large codebases, consider using fork or thread modes
+# JSON output is best for automation and integration
+# HTML output is best for human-readable reports
+# Use verbose mode (-v) for debugging and detailed information
