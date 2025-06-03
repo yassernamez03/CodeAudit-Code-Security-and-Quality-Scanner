@@ -82,11 +82,15 @@ handle_error() {
     echo -e "${RED}Error $error_code:${NC} $message" >&2
     log_message "ERROR" "Code $error_code: $message"
     
-    # Write to history log if available
-    if [[ -w "$HISTORY_LOG" ]]; then
-        local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
-        local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
-        echo "$timestamp : $username : ERROR : Code $error_code: $message" >> "$HISTORY_LOG"
+    # Write to history log if available and writable
+    if [[ -n "$HISTORY_LOG" ]]; then
+        if echo "test" >> "$HISTORY_LOG" 2>/dev/null; then
+            # Remove the test line and write the actual error
+            sed -i '$d' "$HISTORY_LOG" 2>/dev/null
+            local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+            local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+            echo "$timestamp : $username : ERROR : Code $error_code: $message" >> "$HISTORY_LOG" 2>/dev/null
+        fi
     fi
     
     # Show help after error
@@ -117,11 +121,16 @@ setup_history_log() {
         echo "DEBUG: HISTORY_LOG = $HISTORY_LOG" >&2
     fi
     
-    # Create log directory if it doesn't exist
+    # Try to create log directory if it doesn't exist
     if [[ ! -d "$LOG_DIR" ]]; then
         if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
             if [[ $EUID -eq 0 ]]; then
-                mkdir -p "$LOG_DIR" || handle_error 106 "Cannot create log directory $LOG_DIR"
+                # If we're root and still can't create it, that's a real error
+                if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
+                    echo -e "${YELLOW}Warning:${NC} Cannot create log directory $LOG_DIR even as root. Using local directory." >&2
+                    LOG_DIR="$SCRIPT_DIR"
+                    HISTORY_LOG="$SCRIPT_DIR/history.log"
+                fi
             else
                 echo -e "${YELLOW}Warning:${NC} Cannot create $LOG_DIR. Using local directory." >&2
                 LOG_DIR="$SCRIPT_DIR"
@@ -130,12 +139,37 @@ setup_history_log() {
         fi
     fi
     
-    # Create history log file if it doesn't exist
+    # Try to create history log file, with fallback options
     if [[ ! -f "$HISTORY_LOG" ]]; then
         if ! touch "$HISTORY_LOG" 2>/dev/null; then
-            handle_error 106 "Cannot create log file $HISTORY_LOG"
+            # First fallback: try script directory
+            if [[ "$HISTORY_LOG" != "$SCRIPT_DIR/history.log" ]]; then
+                echo -e "${YELLOW}Warning:${NC} Cannot create $HISTORY_LOG. Trying local directory." >&2
+                HISTORY_LOG="$SCRIPT_DIR/history.log"
+                if ! touch "$HISTORY_LOG" 2>/dev/null; then
+                    # Second fallback: try temp directory
+                    echo -e "${YELLOW}Warning:${NC} Cannot create $HISTORY_LOG. Trying temp directory." >&2
+                    HISTORY_LOG="/tmp/codeaudit_history_$(whoami).log"
+                    if ! touch "$HISTORY_LOG" 2>/dev/null; then
+                        # Final fallback: disable history logging
+                        echo -e "${YELLOW}Warning:${NC} Cannot create any history log file. History logging disabled." >&2
+                        HISTORY_LOG=""
+                        return
+                    fi
+                fi
+            else
+                # Already trying script directory, try temp instead
+                echo -e "${YELLOW}Warning:${NC} Cannot create $HISTORY_LOG. Trying temp directory." >&2
+                HISTORY_LOG="/tmp/codeaudit_history_$(whoami).log"
+                if ! touch "$HISTORY_LOG" 2>/dev/null; then
+                    # Final fallback: disable history logging
+                    echo -e "${YELLOW}Warning:${NC} Cannot create any history log file. History logging disabled." >&2
+                    HISTORY_LOG=""
+                    return
+                fi
+            fi
         fi
-        if [[ "$VERBOSE" == true ]]; then
+        if [[ "$VERBOSE" == true && -n "$HISTORY_LOG" ]]; then
             echo "DEBUG: Created new history log file: $HISTORY_LOG" >&2
         fi
     fi
@@ -146,15 +180,44 @@ setup_history_log() {
         chown root:root "$HISTORY_LOG"
     fi
     
-    # Write startup entry
-    local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
-    local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
-    echo "$timestamp : $username : INFOS : Starting CodeAudit v$VERSION" >> "$HISTORY_LOG"
-    
-    # Debug output for verification
-    if [[ "$VERBOSE" == true ]]; then
-        echo "DEBUG: History log will be written to: $HISTORY_LOG" >&2
-        echo "DEBUG: Wrote startup entry to history log" >&2
+    # Write startup entry to history log if available
+    if [[ -n "$HISTORY_LOG" ]]; then
+        local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+        local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+        if echo "$timestamp : $username : INFOS : Starting CodeAudit v$VERSION" >> "$HISTORY_LOG" 2>/dev/null; then
+            # Debug output for verification
+            if [[ "$VERBOSE" == true ]]; then
+                echo "DEBUG: History log will be written to: $HISTORY_LOG" >&2
+                echo "DEBUG: Wrote startup entry to history log" >&2
+            fi
+        else
+            # Failed to write, try fallbacks
+            echo -e "${YELLOW}Warning:${NC} Cannot write to $HISTORY_LOG. Trying fallback locations." >&2
+            
+            # Try script directory
+            HISTORY_LOG="$SCRIPT_DIR/history.log"
+            if echo "$timestamp : $username : INFOS : Starting CodeAudit v$VERSION" >> "$HISTORY_LOG" 2>/dev/null; then
+                if [[ "$VERBOSE" == true ]]; then
+                    echo "DEBUG: Fallback successful. History log: $HISTORY_LOG" >&2
+                fi
+            else
+                # Try temp directory
+                HISTORY_LOG="/tmp/codeaudit_history_$(whoami).log"
+                if echo "$timestamp : $username : INFOS : Starting CodeAudit v$VERSION" >> "$HISTORY_LOG" 2>/dev/null; then
+                    if [[ "$VERBOSE" == true ]]; then
+                        echo "DEBUG: Temp fallback successful. History log: $HISTORY_LOG" >&2
+                    fi
+                else
+                    # Disable history logging
+                    echo -e "${YELLOW}Warning:${NC} All history log locations failed. History logging disabled." >&2
+                    HISTORY_LOG=""
+                fi
+            fi
+        fi
+    else
+        if [[ "$VERBOSE" == true ]]; then
+            echo "DEBUG: History logging is disabled due to permission issues" >&2
+        fi
     fi
 }
 
@@ -250,9 +313,13 @@ restore_defaults() {
     setup_history_log
     
     echo -e "${GREEN}Default settings restored successfully.${NC}"
-    local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
-    local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
-    echo "$timestamp : $username : INFOS : Default settings restored" >> "$HISTORY_LOG"
+    
+    # Write to history log if available
+    if [[ -n "$HISTORY_LOG" ]]; then
+        local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+        local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+        echo "$timestamp : $username : INFOS : Default settings restored" >> "$HISTORY_LOG" 2>/dev/null
+    fi
     
     exit 0
 }
@@ -943,10 +1010,12 @@ main() {
 
     log_message "INFO" "Analysis completed. Files: $TOTAL_FILES_PROCESSED, Issues: $AGGREGATED_ISSUES_FOUND"
     
-    # Write completion entry to history log
-    local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
-    local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
-    echo "$timestamp : $username : INFOS : Analysis completed. Files: $TOTAL_FILES_PROCESSED, Issues: $AGGREGATED_ISSUES_FOUND" >> "$HISTORY_LOG"
+    # Write completion entry to history log if available
+    if [[ -n "$HISTORY_LOG" ]]; then
+        local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+        local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+        echo "$timestamp : $username : INFOS : Analysis completed. Files: $TOTAL_FILES_PROCESSED, Issues: $AGGREGATED_ISSUES_FOUND" >> "$HISTORY_LOG" 2>/dev/null
+    fi
 
     if [[ -n "$OUTPUT_FILE" ]]; then
         echo -e "${GREEN}Analysis complete!${NC} Results written to both terminal and file: $OUTPUT_FILE" >&2
