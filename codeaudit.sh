@@ -84,12 +84,27 @@ handle_error() {
     
     # Write to history log if available and writable
     if [[ -n "$HISTORY_LOG" ]]; then
-        if echo "test" >> "$HISTORY_LOG" 2>/dev/null; then
-            # Remove the test line and write the actual error
-            sed -i '$d' "$HISTORY_LOG" 2>/dev/null
-            local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
-            local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
-            echo "$timestamp : $username : ERROR : Code $error_code: $message" >> "$HISTORY_LOG" 2>/dev/null
+        local timestamp=$(date '+%Y-%m-%d-%H-%M-%S')
+        local username="${USER:-$(whoami 2>/dev/null || echo 'unknown')}"
+        
+        # Try to write to the current HISTORY_LOG location (suppress all output)
+        if { echo "$timestamp : $username : ERROR : Code $error_code: $message" >> "$HISTORY_LOG"; } 2>/dev/null; then
+            # Success - no need for fallback
+            :
+        else
+            # Failed to write, try fallback locations
+            # Try script directory first
+            local fallback_log="$SCRIPT_DIR/history.log"
+            if { echo "$timestamp : $username : ERROR : Code $error_code: $message" >> "$fallback_log"; } 2>/dev/null; then
+                HISTORY_LOG="$fallback_log"  # Update for future use
+            else
+                # Try temp directory
+                fallback_log="/tmp/codeaudit_history_$(whoami).log"
+                if { echo "$timestamp : $username : ERROR : Code $error_code: $message" >> "$fallback_log"; } 2>/dev/null; then
+                    HISTORY_LOG="$fallback_log"  # Update for future use
+                fi
+                # If all fail, just continue without history logging
+            fi
         fi
     fi
     
@@ -266,14 +281,16 @@ OPTIONS:
     -o, --output FILE       Output file (default: stdout)
     -m, --mode MODE         Process mode (sequential, fork, subshell, thread) [default: sequential]
     -d, --directory DIR     Target directory to analyze [default: $DEFAULT_TARGET]
-    -l, --log DIR           Log files directory [default: $DEFAULT_LOG_DIR] (requires admin)
-    -r, --restore           Restore default settings (requires admin)
+    -l, --log DIR           Log files directory [default: $DEFAULT_LOG_DIR] 
+                            Use '.' for current directory (no admin required)
 
 EXAMPLES:
     $0                                    # Analyze default directory
     $0 -v --format json -o report.json   # Detailed JSON output
     $0 -d /path/to/code -f                # Analyze specific directory in fork mode
     $0 -t -v                              # Thread mode with verbose output
+    $0 -l .                               # Use local directory for logs (recommended)
+    $0 -l . -v                            # Local logging with verbose output
     sudo $0 -r                            # Restore default settings
 
 OUTPUT FORMATS:
